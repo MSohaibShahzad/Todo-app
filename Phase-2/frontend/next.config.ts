@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
 
   async rewrites() {
     // Use environment variable for backend URL (Docker-friendly)
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
     return [
       {
