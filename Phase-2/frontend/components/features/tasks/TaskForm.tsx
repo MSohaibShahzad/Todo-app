@@ -114,7 +114,7 @@ export function TaskForm({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <DatePicker
           label="Due Date"
-          value={formData.due_date}
+          value={formData.due_date ?? null}
           onChange={(value) => setFormData({ ...formData, due_date: value || null })}
           disabled={isLoading}
           placeholder="Select due date (optional)"
