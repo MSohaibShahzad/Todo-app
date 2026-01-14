@@ -1,0 +1,7 @@
+# UV Workspace configuration for Phase-2 Todo App
+# This manages the backend FastAPI application
+
+[tool.uv.workspace]
+members = [
+    "backend",
+]

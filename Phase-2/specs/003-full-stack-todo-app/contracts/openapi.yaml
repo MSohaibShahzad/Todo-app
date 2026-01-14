@@ -1,0 +1,543 @@
+openapi: 3.1.0
+info:
+  title: Todo Full-Stack API
+  description: RESTful API for the full-stack Todo application with multi-user support
+  version: 1.0.0
+  contact:
+    name: API Support
+    url: https://github.com/MSohaibShahzad/Todo-app
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+  - url: https://api.todo-app.example.com
+    description: Production server
+
+tags:
+  - name: tasks
+    description: Task management operations
+  - name: health
+    description: Health check endpoints
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Check if the API is running
+      tags: [health]
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/tasks:
+    get:
+      summary: List tasks
+      description: Get all tasks for the authenticated user with optional filtering and sorting
+      tags: [tasks]
+      parameters:
+        - name: status
+          in: query
+          description: Filter by completion status
+          required: false
+          schema:
+            type: string
+            enum: [all, pending, completed]
+            default: all
+        - name: priority
+          in: query
+          description: Filter by priority level
+          required: false
+          schema:
+            type: string
+            enum: [low, medium, high]
+        - name: category
+          in: query
+          description: Filter by category
+          required: false
+          schema:
+            type: string
+            maxLength: 50
+        - name: search
+          in: query
+          description: Search in title and description (case-insensitive)
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+        - name: sort_by
+          in: query
+          description: Field to sort by
+          required: false
+          schema:
+            type: string
+            enum: [created_at, title, priority, due_date]
+            default: created_at
+        - name: sort_order
+          in: query
+          description: Sort direction
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Successfully retrieved tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Create task
+      description: Create a new task for the authenticated user
+      tags: [tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreate'
+      responses:
+        '201':
+          description: Task created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/tasks/{task_id}:
+    get:
+      summary: Get task
+      description: Get a specific task by ID (must belong to authenticated user)
+      tags: [tasks]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Task found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      summary: Update task
+      description: Update an existing task (must belong to authenticated user)
+      tags: [tasks]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdate'
+      responses:
+        '200':
+          description: Task updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Delete task
+      description: Delete a task (must belong to authenticated user)
+      tags: [tasks]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '204':
+          description: Task deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/tasks/{task_id}/complete:
+    patch:
+      summary: Toggle task completion
+      description: Mark a task as complete or incomplete. If the task is recurring and being marked complete, a new instance is created.
+      tags: [tasks]
+      parameters:
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - completed
+              properties:
+                completed:
+                  type: boolean
+                  description: New completion status
+      responses:
+        '200':
+          description: Task completion status updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task:
+                    $ref: '#/components/schemas/TaskResponse'
+                  recurring_task_created:
+                    type: boolean
+                    description: Whether a new recurring task instance was created
+                  new_task:
+                    allOf:
+                      - $ref: '#/components/schemas/TaskResponse'
+                    nullable: true
+                    description: The new recurring task instance (if created)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/tasks/summary:
+    get:
+      summary: Get tasks summary
+      description: Get summary statistics about tasks (overdue count, due today count, total count)
+      tags: [tasks]
+      responses:
+        '200':
+          description: Summary retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                    description: Total number of tasks
+                  pending:
+                    type: integer
+                    description: Number of pending tasks
+                  completed:
+                    type: integer
+                    description: Number of completed tasks
+                  overdue:
+                    type: integer
+                    description: Number of overdue tasks
+                  due_today:
+                    type: integer
+                    description: Number of tasks due today
+                  due_tomorrow:
+                    type: integer
+                    description: Number of tasks due tomorrow
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from Better Auth
+
+  schemas:
+    Priority:
+      type: string
+      enum: [low, medium, high]
+      description: Task priority level
+
+    Recurrence:
+      type: string
+      enum: [none, daily, weekly, monthly]
+      description: Task recurrence pattern
+
+    TaskCreate:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Task title
+          example: "Buy groceries"
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: Optional task description
+          example: "Milk, eggs, bread, cheese"
+        priority:
+          $ref: '#/components/schemas/Priority'
+          default: medium
+        category:
+          type: string
+          maxLength: 50
+          nullable: true
+          description: Optional category label
+          example: "Personal"
+        due_date:
+          type: string
+          format: date
+          nullable: true
+          description: Optional due date (ISO 8601 format)
+          example: "2026-01-15"
+        recurrence:
+          $ref: '#/components/schemas/Recurrence'
+          default: none
+
+    TaskUpdate:
+      type: object
+      description: All fields are optional; only provided fields will be updated
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          nullable: true
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+        priority:
+          allOf:
+            - $ref: '#/components/schemas/Priority'
+          nullable: true
+        category:
+          type: string
+          maxLength: 50
+          nullable: true
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        recurrence:
+          allOf:
+            - $ref: '#/components/schemas/Recurrence'
+          nullable: true
+        completed:
+          type: boolean
+          nullable: true
+
+    TaskResponse:
+      type: object
+      required:
+        - id
+        - user_id
+        - title
+        - completed
+        - priority
+        - recurrence
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          description: Unique task identifier
+          example: 1
+        user_id:
+          type: string
+          description: User ID who owns this task
+          example: "user_abc123"
+        title:
+          type: string
+          description: Task title
+          example: "Buy groceries"
+        description:
+          type: string
+          nullable: true
+          description: Task description
+          example: "Milk, eggs, bread"
+        completed:
+          type: boolean
+          description: Completion status
+          example: false
+        priority:
+          $ref: '#/components/schemas/Priority'
+          example: high
+        category:
+          type: string
+          nullable: true
+          description: Category label
+          example: "Personal"
+        due_date:
+          type: string
+          format: date
+          nullable: true
+          description: Due date
+          example: "2026-01-15"
+        recurrence:
+          $ref: '#/components/schemas/Recurrence'
+          example: none
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          example: "2026-01-09T12:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          example: "2026-01-09T14:30:00Z"
+        is_overdue:
+          type: boolean
+          description: Computed field - true if task is past due date and not completed
+          example: false
+        is_due_today:
+          type: boolean
+          description: Computed field - true if task is due today and not completed
+          example: true
+
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  oneOf:
+                    - type: string
+                    - type: integer
+                description: Location of the error (field path)
+              msg:
+                type: string
+                description: Error message
+              type:
+                type: string
+                description: Error type
+        example:
+          detail:
+            - loc: ["body", "title"]
+              msg: "field required"
+              type: "value_error.missing"
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Error message
+          example: "Not authorized to access this resource"
+
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Could not validate credentials"
+
+    Forbidden:
+      description: Authenticated but not authorized to access this resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Not authorized to access this task"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "Task not found"
+
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            detail: "An unexpected error occurred"
