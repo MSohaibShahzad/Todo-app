@@ -1,12 +1,13 @@
 # Todo Application - Complete Project
 
-A comprehensive todo application showcasing the evolution from a console-based application to a full-stack web application.
+A comprehensive todo application showcasing the evolution from a console-based application to a full-stack web application with conversational AI.
 
 ## 📋 Overview
 
 This project demonstrates a complete development journey:
 - **Phase 1**: Console-based todo app with in-memory storage (Python)
 - **Phase 2**: Full-stack web application with authentication and persistent storage (Next.js + FastAPI)
+- **Phase 3**: Conversational AI layer — manage tasks through natural language chat (OpenAI GPT-4 + MCP)
 
 ## 🗂️ Project Structure
 
@@ -19,18 +20,37 @@ Todo-app/
 │   │   └── cli/         # Console interface
 │   └── tests/           # Unit & integration tests
 │
-└── Phase-2/              # Full-Stack Web Application
-    ├── frontend/         # Next.js 16 + TypeScript
-    │   ├── app/         # App router pages
-    │   ├── components/  # React components
-    │   └── lib/         # Utilities & API client
+├── Phase-2/              # Full-Stack Web Application
+│   ├── frontend/         # Next.js 16 + TypeScript
+│   ├── backend/          # FastAPI + PostgreSQL
+│   └── specs/            # Feature specifications
+│
+└── Phase-3/              # Conversational AI Enhancement
+    ├── frontend/         # Next.js 16 + TypeScript + ChatKit
+    │   ├── app/
+    │   │   ├── (app)/
+    │   │   │   ├── dashboard/   # Task dashboard
+    │   │   │   └── chat/        # AI chat interface
+    │   │   └── (auth)/          # Login / signup
+    │   ├── components/
+    │   │   ├── chat/            # ChatInterface (OpenAI ChatKit)
+    │   │   ├── features/        # Auth, dashboard, task components
+    │   │   └── ui/              # Reusable UI primitives
+    │   └── lib/                 # API client, hooks, auth config
     │
-    ├── backend/          # FastAPI + PostgreSQL
-    │   ├── src/         # API, auth, models, services
-    │   ├── alembic/     # Database migrations
-    │   └── tests/       # Backend tests
+    ├── backend/          # FastAPI + PostgreSQL + AI
+    │   ├── src/
+    │   │   ├── api/             # Routes: health, auth, tasks, chat
+    │   │   ├── models/          # SQLModel: user, task, conversation, message, tool_execution
+    │   │   ├── services/        # Task, conversation, AI agent, cleanup
+    │   │   ├── middleware/      # Rate limiting (SlowAPI + Redis)
+    │   │   └── mcp/             # MCP server — stateless task tools for AI agent
+    │   ├── alembic/             # Database migrations
+    │   └── tests/               # Unit & integration tests
     │
     └── specs/            # Feature specifications
+        ├── 003-full-stack-todo-app/
+        └── 004-conversational-ai/
 ```
 
 ---
@@ -185,23 +205,83 @@ docker-compose up
 
 ---
 
+## 🤖 Phase 3: Conversational AI
+
+Adds a natural-language chat interface on top of the Phase 2 application. Users can create, view, update, delete, and search tasks by typing plain English — no forms required.
+
+### How It Works
+
+1. **Chat UI** (`/chat`) built with OpenAI ChatKit sends messages to the backend.
+2. The **AI Agent** (GPT-4) interprets intent and selects the right **MCP tool** (`add_task`, `list_tasks`, `update_task`, etc.).
+3. Each MCP tool is **stateless**: it runs the operation against PostgreSQL via the existing task service and returns a structured result.
+4. The agent formats the result into a conversational reply.
+5. Full **conversation history** (messages + tool executions) is persisted in the database for context continuity across sessions.
+
+### Features
+
+#### Natural Language Task Management
+- **Create**: "remind me to call John tomorrow at 2pm" → task created with title + due date
+- **View & Search**: "what's due today?" / "show my high priority work tasks"
+- **Update**: "mark groceries as done" / "reschedule report to next Monday"
+- **Delete**: "delete the grocery task" / "clear all completed tasks"
+- **Advanced Queries**: "high priority work tasks due this week sorted by date"
+
+#### Safety & Resource Management
+- **Undo**: Reverse the last AI action to recover from misinterpretations
+- **Clarification**: AI asks follow-up questions when intent is ambiguous
+- **Per-User Rate Limiting**: Fair API usage with request queuing (SlowAPI + Redis)
+- **Concurrent Conversation Limit**: Max 3 active conversations per user
+- **30-Day Retention**: Conversation history is automatically cleaned up daily
+- **User Isolation**: All MCP tools filter by `user_id`; AI agent never touches the DB directly
+
+### Tech Stack (additions over Phase 2)
+
+| Layer | New Dependencies |
+|-------|-----------------|
+| Frontend | `@openai/chatkit-react` |
+| Backend | `openai`, `mcp`, `redis`, `slowapi`, `apscheduler` |
+| Infrastructure | Redis (rate-limit store & request queue) |
+
+### Quick Start
+
+```bash
+cd Phase-3/backend
+cp .env.example .env
+# Add to .env:  OPENAI_API_KEY, AI_MODEL=gpt-4o, REDIS_URL, RATE_LIMIT_PER_MINUTE=10
+uv sync
+uv run alembic upgrade head
+uv run uvicorn src.main:app --reload --port 8000
+
+# second terminal
+cd Phase-3/frontend
+cp .env.local.example .env.local
+npm install
+npm run dev
+```
+
+Frontend: http://localhost:3000 | Chat: http://localhost:3000/chat | API Docs: http://localhost:8000/docs
+
+📖 **[Full Phase-3 Documentation](Phase-3/README.md)**
+
+---
+
 ## 🚀 Development Journey
 
-### Phase 1 → Phase 2 Evolution
+### Phase 1 → Phase 2 → Phase 3 Evolution
 
-| Feature | Phase 1 | Phase 2 |
-|---------|---------|---------|
-| **Storage** | In-memory | PostgreSQL (persistent) |
-| **Interface** | Console (CLI) | Web (React + TypeScript) |
-| **Users** | Single user | Multi-user with authentication |
-| **Platform** | Terminal | Cross-platform web browser |
-| **Data Persistence** | Lost on exit | Persisted in database |
-| **Authentication** | None | JWT + Better Auth |
-| **API** | Direct function calls | REST API (FastAPI) |
-| **UI/UX** | Text-based menu | Modern responsive web UI |
-| **Testing** | 100 unit tests | Unit + integration tests |
+| Feature | Phase 1 | Phase 2 | Phase 3 |
+|---------|---------|---------|---------|
+| **Interface** | Console (CLI) | Web UI (React) | Web UI + Chat |
+| **Storage** | In-memory | PostgreSQL | PostgreSQL (+ conversation tables) |
+| **Users** | Single | Multi-user + auth | Multi-user + auth |
+| **Task Input** | Menu prompts | Forms + modals | Forms **or** natural language |
+| **AI / LLM** | — | — | GPT-4 via OpenAI SDK |
+| **Tool Protocol** | — | — | MCP (stateless tools) |
+| **Rate Limiting** | — | — | SlowAPI + Redis |
+| **Conversation State** | — | — | DB-backed, 30-day retention |
+| **Testing** | 100 unit tests | Unit + integration | Unit + integration + MCP tool tests |
 
-### Key Features Present in Both Phases
+### Key Features Present in All Phases
 ✅ Priority levels with color coding
 ✅ Category organization
 ✅ Due dates with overdue tracking
@@ -222,11 +302,11 @@ uv run pytest --cov=src             # With coverage
 uv run mypy src/ --strict           # Type checking
 ```
 
-### Phase 2
+### Phase 2 & 3
 
 **Backend:**
 ```bash
-cd Phase-2/backend
+cd Phase-2/backend   # or Phase-3/backend
 uv run pytest -v                    # All tests
 uv run pytest --cov=src             # With coverage
 uv run ruff check src/              # Linting
@@ -234,7 +314,7 @@ uv run ruff check src/              # Linting
 
 **Frontend:**
 ```bash
-cd Phase-2/frontend
+cd Phase-2/frontend  # or Phase-3/frontend
 npm test                            # Run tests
 npm run lint                        # ESLint
 npm run type-check                  # TypeScript
@@ -257,13 +337,21 @@ npm run type-check                  # TypeScript
 - ✅ Integration tests for data isolation
 - ✅ Type-safe database models (SQLModel)
 
+### Phase 3
+- ✅ All Phase 2 standards carried forward
+- ✅ MCP tool unit tests (per-tool isolation)
+- ✅ Integration tests for full chat → tool → DB flow
+- ✅ Data-isolation tests (cross-user task access prevention)
+- ✅ Prompt-injection input sanitization
+
 ---
 
 ## 📚 Additional Resources
 
 - **Phase-1 Details**: [Phase-1/README.md](Phase-1/README.md)
 - **Phase-2 Details**: [Phase-2/README.md](Phase-2/README.md)
-- **Quick Start Guide**: [Phase-2/QUICKSTART.md](Phase-2/QUICKSTART.md)
+- **Phase-3 Details**: [Phase-3/README.md](Phase-3/README.md)
+- **Phase-3 Spec**: [Phase-3/specs/004-conversational-ai/spec.md](Phase-3/specs/004-conversational-ai/spec.md)
 - **API Documentation**: http://localhost:8000/docs (when backend is running)
 
 ---
@@ -276,10 +364,10 @@ MIT
 
 ## 🤝 Contributing
 
-Both phases follow strict code quality standards:
+All phases follow strict code quality standards:
 - Type safety (Python type hints / TypeScript)
 - Comprehensive testing
 - Clean code principles
 - Documentation for all public APIs
 
-Feel free to explore both implementations to understand the evolution from a console application to a full-stack web application!
+Feel free to explore the implementations to understand the evolution from a console application to a full-stack web application with conversational AI!
