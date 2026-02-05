@@ -1,4 +1,4 @@
-# Quick Start Guide - Todo App Phase 2
+# Quick Start Guide - Todo App Phase 3: Conversational AI
 
 ## ✅ What's Already Done
 
@@ -59,6 +59,14 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 FRONTEND_URL=http://localhost:3000
 ENVIRONMENT=development
+
+# Phase 3 — Conversational AI (required for /chat)
+OPENAI_API_KEY=sk-your-openai-api-key-here
+AI_MODEL=gpt-4-turbo
+REDIS_URL=redis://localhost:6379
+RATE_LIMIT_REQUESTS_PER_MINUTE=10
+CONVERSATION_RETENTION_DAYS=30
+MAX_ACTIVE_CONVERSATIONS_PER_USER=3
 ```
 
 **Frontend environment (`frontend/.env.local`):**
@@ -77,6 +85,9 @@ DATABASE_URL=postgresql://user:password@localhost:5432/todoapp
 # Generate a strong secret (run: openssl rand -hex 32)
 BETTER_AUTH_SECRET=your-secret-key-change-this-in-production
 BETTER_AUTH_URL=http://localhost:3000
+
+# Phase 3 — ChatKit (use "local-dev" for development)
+NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=local-dev
 ```
 
 ---
@@ -163,6 +174,10 @@ Expected output:
    - ✏️ Edit task details
    - 🗑️ Delete tasks (with confirmation)
    - See task count (total and completed)
+
+5. **Try the AI chat** (requires `OPENAI_API_KEY` in `.env`)
+   - Navigate to `/chat`
+   - Type natural language like "add task: buy groceries" or "show high priority tasks"
 
 ---
 
@@ -260,64 +275,72 @@ curl -X POST http://localhost:8000/api/v1/tasks \
 ## 📂 Project Structure
 
 ```
-Phase-2/
+Phase-3/
 ├── backend/                    # FastAPI backend
 │   ├── src/
-│   │   ├── api/               # API endpoints
+│   │   ├── api/               # Route handlers
 │   │   │   ├── health.py      # Health check
-│   │   │   └── tasks.py       # Task CRUD endpoints
+│   │   │   ├── auth.py        # Auth endpoints
+│   │   │   ├── tasks.py       # Task CRUD endpoints
+│   │   │   ├── chat.py        # Conversation REST endpoints
+│   │   │   └── chatkit.py     # ChatKit protocol endpoints (streaming)
 │   │   ├── auth/              # Authentication
 │   │   │   ├── jwt.py         # JWT token creation/verification
 │   │   │   └── dependencies.py  # get_current_user()
-│   │   ├── models/            # Database models
+│   │   ├── models/            # SQLModel database models
 │   │   │   ├── user.py        # User model
-│   │   │   └── task.py        # Task model
+│   │   │   ├── task.py        # Task model
+│   │   │   ├── conversation.py    # Conversation (chat session)
+│   │   │   ├── message.py         # Message (roles, tool_calls)
+│   │   │   └── tool_execution.py  # Tool execution audit trail
 │   │   ├── schemas/           # Pydantic schemas
-│   │   │   └── task.py        # Task schemas
+│   │   │   ├── task.py        # Task schemas
+│   │   │   └── conversation.py    # Conversation schemas
 │   │   ├── services/          # Business logic
-│   │   │   └── task_service.py  # Task CRUD service
+│   │   │   ├── task_service.py          # Task CRUD
+│   │   │   ├── conversation_service.py  # Conversation CRUD
+│   │   │   ├── ai_agent_service.py      # OpenAI Agents SDK
+│   │   │   ├── chatkit_server.py        # ChatKit server (7 task tools)
+│   │   │   ├── chatkit_store.py         # SQLAlchemy ChatKit store
+│   │   │   ├── recurrence_service.py    # Recurring task logic
+│   │   │   └── cleanup_service.py       # 30-day retention cleanup
+│   │   ├── middleware/        # Rate limiting (SlowAPI + Redis)
+│   │   ├── mcp/               # MCP stateless task tools
 │   │   ├── config.py          # Settings
-│   │   ├── database.py        # DB connection
-│   │   └── main.py            # FastAPI app
+│   │   ├── database.py        # Async DB connection
+│   │   └── main.py            # FastAPI app + scheduler
 │   ├── alembic/               # Database migrations
-│   └── tests/                 # Tests (Phase 9)
+│   └── tests/                 # Unit + integration tests
 │
 ├── frontend/                   # Next.js frontend
 │   ├── app/
-│   │   ├── (auth)/            # Auth pages
+│   │   ├── (auth)/            # Public pages
 │   │   │   ├── login/         # Login page
 │   │   │   └── signup/        # Signup page
-│   │   ├── (app)/             # Protected app pages
-│   │   │   ├── dashboard/     # Main dashboard
-│   │   │   └── layout.tsx     # App layout with auth guard
+│   │   ├── (app)/             # Protected pages (auth guard)
+│   │   │   ├── dashboard/     # Task dashboard
+│   │   │   ├── chat/          # Conversational AI (ChatKit)
+│   │   │   └── layout.tsx     # Navbar + auth guard
 │   │   └── page.tsx           # Home (redirects to dashboard)
 │   ├── components/
-│   │   ├── ui/                # Reusable UI components
-│   │   │   ├── Button.tsx
-│   │   │   ├── Input.tsx
-│   │   │   ├── Card.tsx
-│   │   │   ├── Modal.tsx
-│   │   │   └── Select.tsx
-│   │   └── features/          # Feature components
-│   │       ├── auth/          # Auth components
-│   │       └── tasks/         # Task components
+│   │   ├── chat/              # ChatInterface (ChatKit wrapper)
+│   │   ├── features/          # Auth, dashboard, task components
+│   │   ├── layout/            # Navbar, Footer
+│   │   ├── ui/                # Reusable UI primitives
+│   │   └── providers/         # ToastProvider
 │   ├── lib/
 │   │   ├── api/               # API clients
-│   │   │   ├── client.ts      # Base API client
-│   │   │   └── tasks.ts       # Task API functions
-│   │   ├── auth/              # Auth config
-│   │   │   └── config.ts      # Better Auth setup
-│   │   ├── hooks/             # React hooks
-│   │   │   ├── useAuth.ts     # Auth hook
-│   │   │   └── useTasks.ts    # Tasks SWR hook
-│   │   └── utils/             # Utilities
-│   │       └── cn.ts          # Class merger
-│   └── types/                 # TypeScript types
-│       ├── task.ts            # Task types
-│       └── api.ts             # API types
+│   │   │   ├── client.ts      # Base client (auto JWT)
+│   │   │   ├── tasks.ts       # Task API functions
+│   │   │   └── conversations.ts   # Conversation API functions
+│   │   ├── auth/              # Better Auth config + JWT client
+│   │   ├── hooks/             # useAuth, useTasks, useToast
+│   │   └── utils/             # cn, date-formatting, filters
+│   └── types/                 # Task, API, Conversation types
 │
 └── specs/                      # Feature specifications
-    └── 003-full-stack-todo-app/
+    ├── 003-full-stack-todo-app/   # Phase 2 baseline
+    └── 004-conversational-ai/     # Phase 3 AI layer
 ```
 
 ---
@@ -391,14 +414,15 @@ Your full-stack todo application is now running with:
 ✅ User authentication (signup, login, logout)
 ✅ Task CRUD operations
 ✅ Secure data isolation
+✅ Conversational AI chat at /chat (OpenAI + MCP tools)
 ✅ Professional UI
 ✅ Type-safe TypeScript
 ✅ Production-ready architecture
 
 **Next steps:**
 - Use the app and create tasks!
-- Explore additional features in Phase 5-9
-- Deploy to production (see `README.md` for deployment guide)
+- Set `OPENAI_API_KEY` and explore the conversational AI at `/chat`
+- Deploy to production (see `DOCKER_DEPLOYMENT.md` for the full guide)
 
 ---
 

@@ -13,7 +13,7 @@ Complete guide to deploy the Todo App using Docker and Docker Compose.
 ### 1. Setup Environment Variables
 
 ```bash
-cd Phase-2
+cd Phase-3
 
 # Create environment file
 cp .env.docker.example .env.docker
@@ -310,7 +310,7 @@ cat backup.sql | docker-compose exec -T db psql -U todouser -d todoapp
 ### Backup Docker Volumes
 ```bash
 # Backup postgres data volume
-docker run --rm -v phase-2_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_backup.tar.gz -C /data .
+docker run --rm -v phase-3_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_backup.tar.gz -C /data .
 ```
 
 ## Monitoring
@@ -361,12 +361,19 @@ docker-compose ps
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiry | 1440 (24h) |
 | `FRONTEND_URL` | Frontend URL for CORS | http://localhost:3000 |
 | `ENVIRONMENT` | Environment mode | production |
+| `OPENAI_API_KEY` | OpenAI API key (required for /chat) | **REQUIRED** |
+| `AI_MODEL` | GPT model name | gpt-4-turbo |
+| `REDIS_URL` | Redis URL for rate limiting | redis://localhost:6379 |
+| `RATE_LIMIT_REQUESTS_PER_MINUTE` | Per-user chat RPM | 10 |
+| `CONVERSATION_RETENTION_DAYS` | Auto-delete conversation age | 30 |
+| `MAX_ACTIVE_CONVERSATIONS_PER_USER` | Concurrent conversation cap | 3 |
 
 ### Frontend Environment Variables
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `NEXT_PUBLIC_API_URL` | Public API URL | http://localhost:8000 |
 | `NEXT_PUBLIC_BACKEND_URL` | Internal backend URL | http://backend:8000 |
+| `NEXT_PUBLIC_CHATKIT_DOMAIN_KEY` | ChatKit domain key | local-dev |
 | `DATABASE_URL` | Database URL for Better Auth | Set in docker-compose |
 | `BETTER_AUTH_SECRET` | Better Auth secret key | **REQUIRED** |
 | `BETTER_AUTH_URL` | Better Auth URL | http://localhost:3000 |
