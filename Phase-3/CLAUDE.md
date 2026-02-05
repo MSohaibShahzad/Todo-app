@@ -1,39 +1,44 @@
-# Claude Code Rules - Phase 2
+# Claude Code Rules - Phase 3
 
-# Todo App - Phase 2
- 
+# Todo App - Phase 3: Conversational AI
+
 ## Project Overview
-This is a monorepo using GitHub Spec-Kit for spec-driven development.
- 
+Full-stack todo application with a conversational AI layer. Next.js frontend, FastAPI backend, and an OpenAI-powered chat interface that manages tasks via MCP tools. Uses GitHub Spec-Kit for spec-driven development.
+
 ## Spec-Kit Structure
 Specifications are organized in /specs:
-- /specs/003-full-stack-todo-app/overview.md - Project overview
-- /specs/003-full-stack-todo-app/features/ - Feature specs (what to build)
-- /specs/003-full-stack-todo-app/api/ - API endpoint and MCP tool specs
-- /specs/003-full-stack-todo-app/database/ - Schema and model specs
-- /specs/003-full-stack-todo-app/ui/ - Component and page specs
- 
+- /specs/003-full-stack-todo-app/ - Full-stack todo app (Phase 2 baseline)
+  - overview.md, spec.md, plan.md, tasks.md
+  - features/ - authentication.md, task-crud.md, chatbot.md
+  - api/ - rest-endpoints.md, mcp-tools.md
+  - database/ - schema.md
+  - ui/ - components.md, pages.md
+- /specs/004-conversational-ai/ - Conversational AI layer (Phase 3)
+  - spec.md, plan.md, tasks.md, data-model.md, research.md
+
 ## How to Use Specs
 1. Always read relevant spec before implementing
-2. Reference specs with: @specs/features/task-crud.md
+2. Reference specs with: @specs/004-conversational-ai/spec.md
 3. Update specs if requirements change
- 
+
 ## Project Structure
-- /frontend - Next.js 14 app
-- /backend - Python FastAPI server
- 
+- /frontend - Next.js 16.1.1 app (App Router)
+- /backend - Python FastAPI server with OpenAI AI agent + MCP tools
+- /specs - Feature specifications
+- /docker-compose.yml - Three-service orchestration (db, backend, frontend)
+
 ## Development Workflow
-1. Read spec: @specs/003-full-stack-todo-app/features/[feature].md
+1. Read spec: @specs/004-conversational-ai/spec.md or @specs/003-full-stack-todo-app/features/[feature].md
 2. Implement backend: @backend/CLAUDE.md
 3. Implement frontend: @frontend/CLAUDE.md
 4. Test and iterate
- 
+
 ## Commands
 - Frontend: cd frontend && npm run dev
-- Backend: cd backend && uvicorn main:app --reload
-- Both: docker-compose up
+- Backend: cd backend && uv run uvicorn src.main:app --reload --port 8000
+- Both: docker-compose up --build
 
-**PROJECT LOCATION: /home/sohaib/hackathon2/Todo-app/Phase-2**
+**PROJECT LOCATION: /home/sohaib/hackathon2/Todo-app/Phase-3**
 
 This file is generated during init for the selected agent.
 
@@ -245,4 +250,4 @@ Wait for consent; never auto-create ADRs. Group related decisions (stacks, authe
 See `.specify/memory/constitution.md` for code quality, testing, performance, security, and architecture principles.
 
 ## Recent Changes
-- 004-conversational-ai: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+- 004-conversational-ai: Added Conversation/Message/ToolExecution models, MCP task tools, OpenAI Agents SDK + ChatKit server, chat and chatkit API routes, SQLAlchemy-backed ChatKit store, APScheduler cleanup job, SlowAPI + Redis rate limiting, ChatKit React UI on /chat route

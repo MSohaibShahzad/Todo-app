@@ -36,6 +36,13 @@ services:
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 1440
       FRONTEND_URL: http://localhost:3000
       ENVIRONMENT: production
+      # Phase 3 — Conversational AI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      AI_MODEL: ${AI_MODEL:-gpt-4-turbo}
+      REDIS_URL: ${REDIS_URL:-redis://localhost:6379}
+      RATE_LIMIT_REQUESTS_PER_MINUTE: ${RATE_LIMIT_REQUESTS_PER_MINUTE:-10}
+      CONVERSATION_RETENTION_DAYS: ${CONVERSATION_RETENTION_DAYS:-30}
+      MAX_ACTIVE_CONVERSATIONS_PER_USER: ${MAX_ACTIVE_CONVERSATIONS_PER_USER:-3}
     ports:
       - "8000:8000"
     depends_on:
@@ -60,6 +67,7 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
       NEXT_PUBLIC_BACKEND_URL: http://backend:8000
+      NEXT_PUBLIC_CHATKIT_DOMAIN_KEY: ${NEXT_PUBLIC_CHATKIT_DOMAIN_KEY:-local-dev}
       DATABASE_URL: postgresql://todouser:todopass@db:5432/todoapp
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-your-super-secret-better-auth-key-change-in-production}
       BETTER_AUTH_URL: http://localhost:3000
