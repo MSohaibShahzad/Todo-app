@@ -73,7 +73,7 @@ A full-stack todo application with Next.js frontend and FastAPI backend, enhance
 ### 1. Clone and Setup
 
 ```bash
-cd Phase-3
+cd Phase-4
 ```
 
 ### 2. Backend Setup
