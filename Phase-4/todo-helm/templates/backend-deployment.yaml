@@ -1,0 +1,137 @@
+{{- if .Values.backend.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "todo-app.backend.fullname" . }}
+  labels:
+    {{- include "todo-app.backend.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
+  replicas: {{ .Values.backend.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "todo-app.backend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "todo-app.backend.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "todo-app.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: backend
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+        imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.backend.service.targetPort }}
+          protocol: TCP
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-config
+              key: DATABASE_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-secret
+              key: JWT_SECRET
+        - name: JWT_ALGORITHM
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-config
+              key: JWT_ALGORITHM
+        - name: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-config
+              key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+        - name: FRONTEND_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-config
+              key: FRONTEND_URL
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-config
+              key: ENVIRONMENT
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-secret
+              key: OPENAI_API_KEY
+        - name: AI_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-config
+              key: AI_MODEL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-secret
+              key: REDIS_URL
+        - name: RATE_LIMIT_REQUESTS_PER_MINUTE
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-config
+              key: RATE_LIMIT_REQUESTS_PER_MINUTE
+        - name: CONVERSATION_RETENTION_DAYS
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-config
+              key: CONVERSATION_RETENTION_DAYS
+        - name: MAX_ACTIVE_CONVERSATIONS_PER_USER
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "todo-app.backend.fullname" . }}-config
+              key: MAX_ACTIVE_CONVERSATIONS_PER_USER
+        {{- if .Values.backend.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.backend.livenessProbe.httpGet.path }}
+            port: {{ .Values.backend.livenessProbe.httpGet.port }}
+          initialDelaySeconds: {{ .Values.backend.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.backend.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.backend.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.backend.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.backend.readinessProbe.enabled }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.backend.readinessProbe.httpGet.path }}
+            port: {{ .Values.backend.readinessProbe.httpGet.port }}
+          initialDelaySeconds: {{ .Values.backend.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.backend.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.backend.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.backend.readinessProbe.failureThreshold }}
+        {{- end }}
+        resources:
+          {{- toYaml .Values.backend.resources | nindent 10 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,28 @@
+apiVersion: v2
+name: todo-app
+description: A Helm chart for Todo App - Full-stack application with Next.js frontend, FastAPI backend, and PostgreSQL database with Conversational AI
+
+type: application
+
+# Chart version - increment when making changes to the chart
+version: 1.0.0
+
+# Application version - Phase 4 with Conversational AI
+appVersion: "4.0.0"
+
+keywords:
+  - todo
+  - task-management
+  - nextjs
+  - fastapi
+  - postgresql
+  - conversational-ai
+  - openai
+
+maintainers:
+  - name: Todo App Team
+    email: team@todoapp.com
+
+home: https://github.com/yourusername/todo-app
+sources:
+  - https://github.com/yourusername/todo-app

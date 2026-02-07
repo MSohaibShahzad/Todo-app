@@ -1,0 +1,503 @@
+mcp_version: "1.0"
+server_name: "todo-mcp-server"
+description: "MCP server exposing task management operations as tools for AI agents"
+
+tools:
+  - name: add_task
+    description: "Create a new task in the user's todo list"
+    input_schema:
+      type: object
+      required:
+        - user_id
+        - title
+      properties:
+        user_id:
+          type: string
+          description: "Authenticated user's ID from context"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: "Task title (required)"
+        description:
+          type: string
+          maxLength: 2000
+          description: "Optional detailed description of the task"
+        priority:
+          type: string
+          enum: ["low", "medium", "high"]
+          default: "medium"
+          description: "Task priority level"
+        category:
+          type: string
+          maxLength: 100
+          description: "Optional task category (e.g., 'work', 'personal')"
+        due_date:
+          type: string
+          format: date-time
+          description: "Optional due date in ISO 8601 format (e.g., '2026-01-16T15:00:00Z')"
+        recurrence:
+          type: string
+          enum: ["none", "daily", "weekly", "monthly"]
+          default: "none"
+          description: "Optional recurrence pattern"
+    output_schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        task_id:
+          type: integer
+        message:
+          type: string
+          example: "Task created: 'Buy groceries' (ID: 42)"
+    error_codes:
+      - code: "VALIDATION_ERROR"
+        description: "Invalid input parameters (e.g., empty title, invalid date)"
+      - code: "DATABASE_ERROR"
+        description: "Failed to persist task to database"
+      - code: "AUTH_ERROR"
+        description: "Invalid or missing user_id"
+
+  - name: list_tasks
+    description: "Retrieve tasks from the user's todo list with optional filtering"
+    input_schema:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: "Authenticated user's ID from context"
+        completed:
+          type: boolean
+          description: "Filter by completion status (omit for all tasks)"
+        priority:
+          type: string
+          enum: ["low", "medium", "high"]
+          description: "Filter by priority level"
+        category:
+          type: string
+          description: "Filter by category"
+        due_date_start:
+          type: string
+          format: date-time
+          description: "Filter tasks due after this date"
+        due_date_end:
+          type: string
+          format: date-time
+          description: "Filter tasks due before this date"
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+          description: "Maximum number of tasks to return"
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+          description: "Number of tasks to skip (for pagination)"
+    output_schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        tasks:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              description:
+                type: string
+                nullable: true
+              completed:
+                type: boolean
+              priority:
+                type: string
+              category:
+                type: string
+                nullable: true
+              due_date:
+                type: string
+                format: date-time
+                nullable: true
+              recurrence:
+                type: string
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+        total_count:
+          type: integer
+          description: "Total number of tasks matching filters"
+        message:
+          type: string
+          example: "Found 5 tasks"
+    error_codes:
+      - code: "DATABASE_ERROR"
+        description: "Failed to query tasks from database"
+      - code: "AUTH_ERROR"
+        description: "Invalid or missing user_id"
+
+  - name: update_task
+    description: "Update an existing task's attributes"
+    input_schema:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: string
+          description: "Authenticated user's ID from context"
+        task_id:
+          type: integer
+          description: "ID of the task to update"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: "New task title"
+        description:
+          type: string
+          maxLength: 2000
+          description: "New task description"
+        priority:
+          type: string
+          enum: ["low", "medium", "high"]
+          description: "New priority level"
+        category:
+          type: string
+          maxLength: 100
+          description: "New category"
+        due_date:
+          type: string
+          format: date-time
+          description: "New due date (ISO 8601 format)"
+        completed:
+          type: boolean
+          description: "Mark task as complete or incomplete"
+    output_schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        task_id:
+          type: integer
+        updated_fields:
+          type: array
+          items:
+            type: string
+          description: "List of fields that were updated"
+        message:
+          type: string
+          example: "Updated task 42: priority changed to 'high'"
+    error_codes:
+      - code: "NOT_FOUND"
+        description: "Task with given ID does not exist or user lacks access"
+      - code: "VALIDATION_ERROR"
+        description: "Invalid update parameters"
+      - code: "DATABASE_ERROR"
+        description: "Failed to update task in database"
+      - code: "AUTH_ERROR"
+        description: "User does not own this task"
+
+  - name: delete_task
+    description: "Permanently delete a task from the user's todo list"
+    input_schema:
+      type: object
+      required:
+        - user_id
+        - task_id
+      properties:
+        user_id:
+          type: string
+          description: "Authenticated user's ID from context"
+        task_id:
+          type: integer
+          description: "ID of the task to delete"
+    output_schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        task_id:
+          type: integer
+        message:
+          type: string
+          example: "Deleted task 42: 'Buy groceries'"
+    error_codes:
+      - code: "NOT_FOUND"
+        description: "Task with given ID does not exist or user lacks access"
+      - code: "DATABASE_ERROR"
+        description: "Failed to delete task from database"
+      - code: "AUTH_ERROR"
+        description: "User does not own this task"
+
+  - name: mark_task_complete
+    description: "Mark a task as complete or incomplete"
+    input_schema:
+      type: object
+      required:
+        - user_id
+        - task_id
+        - completed
+      properties:
+        user_id:
+          type: string
+          description: "Authenticated user's ID from context"
+        task_id:
+          type: integer
+          description: "ID of the task to update"
+        completed:
+          type: boolean
+          description: "True to mark complete, false to mark incomplete"
+    output_schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        task_id:
+          type: integer
+        completed:
+          type: boolean
+        message:
+          type: string
+          example: "Marked task 42 as complete"
+    error_codes:
+      - code: "NOT_FOUND"
+        description: "Task with given ID does not exist or user lacks access"
+      - code: "DATABASE_ERROR"
+        description: "Failed to update task status"
+      - code: "AUTH_ERROR"
+        description: "User does not own this task"
+
+  - name: search_tasks
+    description: "Search tasks by keyword in title or description"
+    input_schema:
+      type: object
+      required:
+        - user_id
+        - query
+      properties:
+        user_id:
+          type: string
+          description: "Authenticated user's ID from context"
+        query:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: "Search keyword or phrase"
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+          description: "Maximum number of results to return"
+    output_schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        tasks:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              title:
+                type: string
+              description:
+                type: string
+                nullable: true
+              completed:
+                type: boolean
+              priority:
+                type: string
+              category:
+                type: string
+                nullable: true
+              due_date:
+                type: string
+                format: date-time
+                nullable: true
+              relevance_score:
+                type: number
+                description: "Search relevance (0-1)"
+        total_count:
+          type: integer
+        message:
+          type: string
+          example: "Found 3 tasks matching 'groceries'"
+    error_codes:
+      - code: "VALIDATION_ERROR"
+        description: "Invalid search query"
+      - code: "DATABASE_ERROR"
+        description: "Failed to execute search query"
+      - code: "AUTH_ERROR"
+        description: "Invalid or missing user_id"
+
+  - name: bulk_delete_tasks
+    description: "Delete multiple tasks at once (e.g., 'clear all completed tasks')"
+    input_schema:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: "Authenticated user's ID from context"
+        task_ids:
+          type: array
+          items:
+            type: integer
+          description: "Specific task IDs to delete (if provided, filters are ignored)"
+        completed:
+          type: boolean
+          description: "Delete all completed/incomplete tasks (used when task_ids not provided)"
+        category:
+          type: string
+          description: "Delete all tasks in this category (used when task_ids not provided)"
+    output_schema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        deleted_count:
+          type: integer
+        message:
+          type: string
+          example: "Deleted 5 completed tasks"
+    error_codes:
+      - code: "VALIDATION_ERROR"
+        description: "Invalid parameters (must provide either task_ids or filters)"
+      - code: "DATABASE_ERROR"
+        description: "Failed to delete tasks"
+      - code: "AUTH_ERROR"
+        description: "User does not own one or more specified tasks"
+
+server_metadata:
+  version: "1.0.0"
+  capabilities:
+    - "task_management"
+    - "filtering"
+    - "search"
+    - "bulk_operations"
+  rate_limits:
+    requests_per_minute: 60
+    requests_per_hour: 1000
+  authentication:
+    required: true
+    method: "context_variables"
+    description: "User ID must be provided via context_variables in agent calls"
+
+integration_notes:
+  stateless_requirement: |
+    All tools are stateless. They accept user_id and other parameters,
+    perform database operations, and return results. No state is maintained
+    between calls.
+
+  error_handling: |
+    Tools return structured error responses with error_code and message.
+    AI agent should interpret errors and communicate failures conversationally.
+
+  database_access: |
+    Tools directly access the database through SQLModel ORM.
+    All queries filter by user_id to ensure user isolation.
+
+  transaction_safety: |
+    Each tool call runs in its own database transaction.
+    If a tool fails, changes are rolled back automatically.
+
+  undo_support: |
+    Tool executions are logged to tool_executions table.
+    Undo functionality reverses the last successful tool execution
+    by calling appropriate inverse operation (e.g., delete_task for add_task).
+
+examples:
+  - name: "Add a task with natural language"
+    user_input: "Remind me to call John tomorrow at 2pm"
+    agent_interpretation:
+      tool: "add_task"
+      parameters:
+        user_id: "user_123"
+        title: "Call John"
+        due_date: "2026-01-16T14:00:00Z"
+        priority: "medium"
+    tool_response:
+      success: true
+      task_id: 42
+      message: "Task created: 'Call John' (ID: 42)"
+    agent_response: "I've added 'Call John' to your tasks for tomorrow at 2pm."
+
+  - name: "List tasks with filtering"
+    user_input: "Show me my high priority work tasks"
+    agent_interpretation:
+      tool: "list_tasks"
+      parameters:
+        user_id: "user_123"
+        priority: "high"
+        category: "work"
+    tool_response:
+      success: true
+      tasks:
+        - id: 15
+          title: "Finish quarterly report"
+          priority: "high"
+          category: "work"
+          due_date: "2026-01-18T17:00:00Z"
+        - id: 23
+          title: "Review budget proposal"
+          priority: "high"
+          category: "work"
+          due_date: null
+      total_count: 2
+      message: "Found 2 tasks"
+    agent_response: "You have 2 high priority work tasks: 'Finish quarterly report' (due Jan 18) and 'Review budget proposal' (no due date)."
+
+  - name: "Mark task complete"
+    user_input: "Mark the groceries task as done"
+    agent_interpretation:
+      tool: "search_tasks"
+      parameters:
+        user_id: "user_123"
+        query: "groceries"
+    tool_response:
+      success: true
+      tasks:
+        - id: 42
+          title: "Buy groceries"
+      total_count: 1
+    agent_follow_up_call:
+      tool: "mark_task_complete"
+      parameters:
+        user_id: "user_123"
+        task_id: 42
+        completed: true
+    tool_response:
+      success: true
+      task_id: 42
+      completed: true
+      message: "Marked task 42 as complete"
+    agent_response: "I've marked 'Buy groceries' as complete. Great job!"
+
+  - name: "Bulk delete completed tasks"
+    user_input: "Clear all my completed tasks"
+    agent_interpretation:
+      tool: "bulk_delete_tasks"
+      parameters:
+        user_id: "user_123"
+        completed: true
+    tool_response:
+      success: true
+      deleted_count: 5
+      message: "Deleted 5 completed tasks"
+    agent_response: "I've cleared 5 completed tasks from your list."

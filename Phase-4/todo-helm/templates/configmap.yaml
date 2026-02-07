@@ -1,0 +1,36 @@
+{{- if .Values.backend.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "todo-app.backend.fullname" . }}-config
+  labels:
+    {{- include "todo-app.backend.labels" . | nindent 4 }}
+data:
+  DATABASE_URL: {{ include "todo-app.database.connectionString" . | quote }}
+  JWT_ALGORITHM: {{ .Values.backend.env.JWT_ALGORITHM | quote }}
+  JWT_ACCESS_TOKEN_EXPIRE_MINUTES: {{ .Values.backend.env.JWT_ACCESS_TOKEN_EXPIRE_MINUTES | quote }}
+  FRONTEND_URL: "http://{{ .Values.ingress.frontend.host }}"
+  ENVIRONMENT: {{ .Values.backend.env.ENVIRONMENT | quote }}
+  AI_MODEL: {{ .Values.backend.env.AI_MODEL | quote }}
+  RATE_LIMIT_REQUESTS_PER_MINUTE: {{ .Values.backend.env.RATE_LIMIT_REQUESTS_PER_MINUTE | quote }}
+  CONVERSATION_RETENTION_DAYS: {{ .Values.backend.env.CONVERSATION_RETENTION_DAYS | quote }}
+  MAX_ACTIVE_CONVERSATIONS_PER_USER: {{ .Values.backend.env.MAX_ACTIVE_CONVERSATIONS_PER_USER | quote }}
+{{- end }}
+
+{{- if .Values.frontend.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "todo-app.frontend.fullname" . }}-config
+  labels:
+    {{- include "todo-app.frontend.labels" . | nindent 4 }}
+data:
+  NEXT_PUBLIC_API_URL: "http://{{ .Values.ingress.backend.host }}"
+  NEXT_PUBLIC_BACKEND_URL: "http://{{ include "todo-app.backend.fullname" . }}:{{ .Values.backend.service.port }}"
+  NEXT_PUBLIC_CHATKIT_DOMAIN_KEY: {{ .Values.frontend.env.NEXT_PUBLIC_CHATKIT_DOMAIN_KEY | quote }}
+  DATABASE_URL: {{ include "todo-app.database.connectionString" . | quote }}
+  BETTER_AUTH_URL: "http://{{ .Values.ingress.frontend.host }}"
+  NODE_ENV: {{ .Values.frontend.env.NODE_ENV | quote }}
+{{- end }}
