@@ -1,6 +1,8 @@
-# Docker Deployment Guide
+# Docker Deployment Guide - Phase 4
 
 Complete guide to deploy the Todo App using Docker and Docker Compose.
+
+> **📌 Note**: For production Kubernetes deployment, see [HELM_DEPLOYMENT_GUIDE.md](./HELM_DEPLOYMENT_GUIDE.md) or [QUICKSTART.md](./QUICKSTART.md)
 
 ## Prerequisites
 
@@ -13,7 +15,7 @@ Complete guide to deploy the Todo App using Docker and Docker Compose.
 ### 1. Setup Environment Variables
 
 ```bash
-cd Phase-3
+cd Phase-4
 
 # Create environment file
 cp .env.docker.example .env.docker
@@ -47,6 +49,7 @@ Once all services are running:
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
+- **Conversational AI Chat**: http://localhost:3000/chat (OpenAI ChatKit)
 - **PostgreSQL**: localhost:5432
 
 ### 4. Create Your Account
@@ -55,26 +58,34 @@ Once all services are running:
 2. Click "Sign Up"
 3. Create your account
 4. Start managing your tasks!
+5. Try the AI chat at http://localhost:3000/chat (requires OPENAI_API_KEY)
 
 ## Service Architecture
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Frontend (Next.js)                         │
+│  Frontend (Next.js + ChatKit)               │
 │  Port: 3000                                 │
 │  Container: todo-frontend                   │
+│  • Better Auth Session Management          │
+│  • OpenAI ChatKit UI                        │
 └──────────────┬──────────────────────────────┘
                │ HTTP API Calls
 ┌──────────────▼──────────────────────────────┐
-│  Backend (FastAPI)                          │
+│  Backend (FastAPI + AI)                     │
 │  Port: 8000                                 │
 │  Container: todo-backend                    │
+│  • OpenAI GPT-4 Conversational AI          │
+│  • MCP Task Tools                           │
+│  • Rate Limiting (SlowAPI + Redis)         │
 └──────────────┬──────────────────────────────┘
                │ Database Queries
 ┌──────────────▼──────────────────────────────┐
 │  Database (PostgreSQL)                      │
 │  Port: 5432                                 │
 │  Container: todo-db                         │
+│  • User Authentication Data                │
+│  • Tasks & Conversations                   │
 └─────────────────────────────────────────────┘
 ```
 
@@ -310,7 +321,7 @@ cat backup.sql | docker-compose exec -T db psql -U todouser -d todoapp
 ### Backup Docker Volumes
 ```bash
 # Backup postgres data volume
-docker run --rm -v phase-3_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_backup.tar.gz -C /data .
+docker run --rm -v phase-4_postgres_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_backup.tar.gz -C /data .
 ```
 
 ## Monitoring
@@ -389,8 +400,34 @@ For issues or questions:
 
 ---
 
-**Note**: This setup is optimized for development and small-scale production. For large-scale production deployments, consider:
-- Kubernetes for orchestration
+## 🚀 Production Deployment Options
+
+### Recommended: Kubernetes/Helm (Phase 4)
+
+For production-ready deployment with auto-scaling, high availability, and monitoring:
+
+📖 **See**: [HELM_DEPLOYMENT_GUIDE.md](./HELM_DEPLOYMENT_GUIDE.md)
+
+**Quick Start**: [QUICKSTART.md](./QUICKSTART.md)
+
+**Features**:
+- ✅ Kubernetes orchestration with Helm charts
+- ✅ Auto-scaling (HPA)
+- ✅ Health probes & self-healing
+- ✅ Persistent storage
+- ✅ Ingress routing
+- ✅ ConfigMaps & Secrets management
+- ✅ Rolling updates & rollbacks
+
+### Alternative: Docker Compose (Current Guide)
+
+This Docker Compose setup is optimized for:
+- ✅ Local development
+- ✅ Small-scale production
+- ✅ Testing environments
+
+For large-scale production, consider:
+- **Kubernetes for orchestration** (see HELM_DEPLOYMENT_GUIDE.md)
 - Managed database services (AWS RDS, Google Cloud SQL, etc.)
 - CDN for frontend assets
 - Load balancing for multiple backend instances
