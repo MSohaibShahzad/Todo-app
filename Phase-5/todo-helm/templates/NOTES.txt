@@ -1,0 +1,116 @@
+========================================
+Todo App - Phase 4: Conversational AI
+========================================
+
+Thank you for installing {{ .Chart.Name }} version {{ .Chart.Version }}!
+
+Your release is named {{ .Release.Name }}.
+
+Deployed Services:
+{{- if .Values.database.enabled }}
+  ✓ PostgreSQL Database
+{{- end }}
+{{- if .Values.backend.enabled }}
+  ✓ FastAPI Backend (with OpenAI Conversational AI)
+{{- end }}
+{{- if .Values.frontend.enabled }}
+  ✓ Next.js Frontend (with ChatKit)
+{{- end }}
+
+========================================
+
+To access your Todo App:
+
+{{- if .Values.ingress.enabled }}
+
+1. Add the following entry to your /etc/hosts file (for local development):
+
+   echo "$(minikube ip) {{ .Values.ingress.frontend.host }}" | sudo tee -a /etc/hosts
+
+2. Access the application:
+
+   Frontend: http://{{ .Values.ingress.frontend.host }}
+   Backend API: http://{{ .Values.ingress.frontend.host }}/api
+
+{{- else }}
+
+The Ingress is not enabled. To access your application:
+
+1. Frontend:
+   kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "todo-app.frontend.fullname" . }} 3000:3000
+   Then visit: http://localhost:3000
+
+2. Backend:
+   kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "todo-app.backend.fullname" . }} 8000:8000
+   Then visit: http://localhost:8000/api/v1/health
+
+{{- end }}
+
+========================================
+
+Monitoring your deployment:
+
+1. Check the status of all pods:
+   kubectl get pods --namespace {{ .Release.Namespace }}
+
+2. View logs:
+   # Frontend logs
+   kubectl logs --namespace {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "todo-app.name" . }}-frontend -f
+
+   # Backend logs
+   kubectl logs --namespace {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "todo-app.name" . }}-backend -f
+
+   # Database logs
+   kubectl logs --namespace {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "todo-app.name" . }}-database -f
+
+3. Check services:
+   kubectl get svc --namespace {{ .Release.Namespace }}
+
+4. Check ingress:
+   kubectl get ingress --namespace {{ .Release.Namespace }}
+
+========================================
+
+IMPORTANT - Configuration:
+
+Before using the application, ensure you have updated the following values:
+
+1. Backend secrets (in values.yaml):
+   - backend.secrets.JWT_SECRET
+   - backend.secrets.OPENAI_API_KEY (required for conversational AI)
+   - backend.secrets.REDIS_URL (if using Redis)
+
+2. Frontend secrets:
+   - frontend.secrets.BETTER_AUTH_SECRET
+
+3. Database credentials:
+   - database.auth.username
+   - database.auth.password
+   - database.auth.database
+
+You can update these values and upgrade the release:
+  helm upgrade {{ .Release.Name }} ./todo-helm --namespace {{ .Release.Namespace }}
+
+========================================
+
+Useful Commands:
+
+# Upgrade the release
+helm upgrade {{ .Release.Name }} ./todo-helm --namespace {{ .Release.Namespace }}
+
+# Rollback to previous version
+helm rollback {{ .Release.Name }} --namespace {{ .Release.Namespace }}
+
+# Uninstall the release
+helm uninstall {{ .Release.Name }} --namespace {{ .Release.Namespace }}
+
+# Get release values
+helm get values {{ .Release.Name }} --namespace {{ .Release.Namespace }}
+
+========================================
+
+For more information, visit:
+  - Chart: {{ .Chart.Home }}
+  - Docs: https://github.com/yourusername/todo-app
+
+Enjoy your Todo App with Conversational AI! 🚀

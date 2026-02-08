@@ -1,0 +1,507 @@
+openapi: 3.0.3
+info:
+  title: Conversational AI Chat API
+  description: Backend API for conversational task management
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development
+  - url: https://api.todo-app.com/api/v1
+    description: Production
+
+security:
+  - BearerAuth: []
+
+paths:
+  /conversations:
+    get:
+      summary: List user's conversations
+      description: Get all conversations for the authenticated user
+      tags:
+        - Conversations
+      parameters:
+        - name: is_active
+          in: query
+          description: Filter by active status
+          required: false
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          description: Maximum number of conversations to return
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Conversation'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      summary: Create new conversation
+      description: Start a new conversation session
+      tags:
+        - Conversations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 255
+                  example: "Planning work tasks"
+                initial_message:
+                  type: string
+                  maxLength: 2000
+                  example: "Show me my tasks for today"
+      responses:
+        '201':
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationWithMessages'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /conversations/{conversation_id}:
+    get:
+      summary: Get conversation details
+      description: Retrieve a specific conversation with message history
+      tags:
+        - Conversations
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: message_limit
+          in: query
+          description: Number of recent messages to include
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Conversation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationWithMessages'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      summary: Update conversation
+      description: Update conversation metadata (title, active status)
+      tags:
+        - Conversations
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 255
+                is_active:
+                  type: boolean
+                  description: Set to false to archive conversation
+      responses:
+        '200':
+          description: Conversation updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete conversation
+      description: Permanently delete a conversation and all messages
+      tags:
+        - Conversations
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Conversation deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /conversations/{conversation_id}/messages:
+    post:
+      summary: Send message
+      description: Send a user message and receive AI response
+      tags:
+        - Messages
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                  example: "Add a task to buy groceries tomorrow"
+      responses:
+        '200':
+          description: Message sent and response received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_message:
+                    $ref: '#/components/schemas/Message'
+                  assistant_message:
+                    $ref: '#/components/schemas/Message'
+                  tool_executions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ToolExecution'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '503':
+          description: AI service unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "AI service temporarily unavailable. Please try using the traditional UI."
+
+  /conversations/{conversation_id}/undo:
+    post:
+      summary: Undo last action
+      description: Reverse the last tool execution in the conversation
+      tags:
+        - Messages
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Action undone
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Last action (task creation) has been undone"
+                  undone_execution:
+                    $ref: '#/components/schemas/ToolExecution'
+        '400':
+          description: No action to undo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "No recent action to undo"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /conversations/{conversation_id}/stream:
+    post:
+      summary: Send message with streaming response
+      description: Send a message and stream the AI response in real-time
+      tags:
+        - Messages
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+      responses:
+        '200':
+          description: Streaming response
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-Sent Events stream
+              examples:
+                streamingResponse:
+                  value: |
+                    data: {"type": "token", "content": "I'll"}
+                    data: {"type": "token", "content": " add"}
+                    data: {"type": "token", "content": " that"}
+                    data: {"type": "tool_call", "tool": "add_task", "status": "started"}
+                    data: {"type": "tool_call", "tool": "add_task", "status": "completed", "result": "Task created: ID 42"}
+                    data: {"type": "token", "content": " task"}
+                    data: {"type": "done"}
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from Better-Auth
+
+  schemas:
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        user_id:
+          type: string
+          example: "user_123abc"
+        title:
+          type: string
+          nullable: true
+          example: "Work planning session"
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-01-15T10:30:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-01-15T14:22:00Z"
+        message_count:
+          type: integer
+          example: 12
+          description: Total messages in conversation (computed)
+
+    ConversationWithMessages:
+      allOf:
+        - $ref: '#/components/schemas/Conversation'
+        - type: object
+          properties:
+            messages:
+              type: array
+              items:
+                $ref: '#/components/schemas/Message'
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 42
+        conversation_id:
+          type: integer
+          example: 1
+        role:
+          type: string
+          enum: [user, assistant, system]
+          example: "assistant"
+        content:
+          type: string
+          example: "I've added 'Buy groceries' to your task list for tomorrow."
+        tool_calls:
+          type: object
+          nullable: true
+          description: JSON structure of tool calls (for assistant messages)
+          example:
+            calls:
+              - tool_name: "add_task"
+                parameters:
+                  title: "Buy groceries"
+                  due_date: "2026-01-16"
+                result: "Task created: ID 42"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-01-15T14:22:00Z"
+
+    ToolExecution:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 7
+        message_id:
+          type: integer
+          example: 42
+        conversation_id:
+          type: integer
+          example: 1
+        tool_name:
+          type: string
+          example: "add_task"
+        parameters:
+          type: object
+          example:
+            title: "Buy groceries"
+            priority: "high"
+            due_date: "2026-01-16"
+        result:
+          type: object
+          nullable: true
+          example:
+            task_id: 42
+            status: "created"
+        status:
+          type: string
+          enum: [pending, success, failed]
+          example: "success"
+        error_message:
+          type: string
+          nullable: true
+          example: null
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-01-15T14:22:00Z"
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-01-15T14:22:01Z"
+
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail:
+                type: string
+                example: "Not authenticated"
+
+    BadRequest:
+      description: Invalid request data
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail:
+                type: string
+                example: "Message content cannot be empty"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail:
+                type: string
+                example: "Conversation not found"
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail:
+                type: string
+                example: "Rate limit exceeded. Please try again in 30 seconds."
+              retry_after:
+                type: integer
+                description: Seconds until rate limit resets
+                example: 30
+
+tags:
+  - name: Conversations
+    description: Conversation management operations
+  - name: Messages
+    description: Message sending and streaming operations

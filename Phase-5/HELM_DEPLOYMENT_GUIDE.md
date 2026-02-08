@@ -1,0 +1,590 @@
+# Helm Chart Deployment Guide - Todo App Phase 4
+
+**Date**: February 6, 2026
+**Version**: 1.0.0
+**Author**: Claude Code
+
+---
+
+## = Overview
+
+This guide documents the complete Helm chart setup for deploying the Todo App (Phase 4 - Conversational AI) on Kubernetes/Minikube. The Helm chart has been fully configured and is ready for deployment.
+
+## < What Was Done
+
+### Helm Chart Structure Created
+
+```
+todo-helm/
+ Chart.yaml                          # Chart metadata v1.0.0
+ values.yaml                         # Complete configuration (250+ lines)
+ README.md                           # Deployment documentation
+ templates/
+     _helpers.tpl                    # Helper templates for all services
+     NOTES.txt                       # Post-installation instructions
+     configmap.yaml                  # Environment variables (backend/frontend)
+     secret.yaml                     # Sensitive data (JWT, OpenAI, DB creds)
+     pvc.yaml                        # PostgreSQL persistent storage
+     database-deployment.yaml        # PostgreSQL StatefulSet-like deployment
+     database-service.yaml           # Database ClusterIP service
+     backend-deployment.yaml         # FastAPI backend deployment
+     backend-service.yaml            # Backend ClusterIP service
+     frontend-deployment.yaml        # Next.js frontend deployment
+     frontend-service.yaml           # Frontend ClusterIP service
+     ingress.yaml                    # NGINX Ingress (frontend + backend)
+     hpa.yaml                        # Horizontal Pod Autoscaler
+     serviceaccount.yaml             # Service account
+```
+
+### Key Features Implemented
+
+ **Three-Tier Architecture**
+- PostgreSQL database with persistent storage (5Gi)
+- FastAPI backend with health checks
+- Next.js frontend with Better Auth
+
+ **Configuration Management**
+- ConfigMaps for environment variables
+- Secrets for sensitive data (JWT, OpenAI API key, database passwords)
+- Database connection string auto-generated
+
+ **Networking**
+- Ingress with path-based routing:
+  - `/api/*`  Backend service
+  - `/*`  Frontend service
+- ClusterIP services for internal communication
+- Single hostname: `todo-app.local`
+
+ **High Availability**
+- Health probes (liveness/readiness)
+- Resource limits and requests
+- Horizontal Pod Autoscaler (optional)
+- Pod disruption budgets (can be added)
+
+ **Conversational AI Configuration**
+- OpenAI GPT-4 integration
+- Rate limiting (10 requests/min per user)
+- 30-day conversation retention
+- 3 concurrent conversations per user limit
+
+---
+
+## = Deployment Steps
+
+### Prerequisites
+
+Before starting, ensure you have:
+
+- [x] Minikube installed and running
+- [x] kubectl configured
+- [x] Helm 3.0+ installed
+- [x] Docker images built for Phase 4:
+  - `todo-backend:latest`
+  - `todo-frontend:latest`
+- [x] OpenAI API key (for conversational AI features)
+
+### Step 1: Start Minikube
+
+```bash
+# Start Minikube with enough resources
+minikube start --cpus=4 --memory=8192 --driver=docker
+
+# Verify it's running
+minikube status
+
+# Enable Ingress addon
+minikube addons enable ingress
+
+# Verify Ingress controller is running
+kubectl get pods -n ingress-nginx
+```
+
+### Step 2: Build and Load Docker Images
+
+```bash
+# Configure shell to use Minikube's Docker daemon
+eval $(minikube docker-env)
+
+# Navigate to project root
+cd /home/sohaib/hackathon2/Todo-app/Phase-4
+
+# Build backend image
+cd backend
+docker build -t todo-backend:latest .
+cd ..
+
+# Build frontend image
+cd frontend
+docker build -t todo-frontend:latest .
+cd ..
+
+# Verify images are available
+docker images | grep todo
+```
+
+**Expected Output:**
+```
+todo-backend    latest    <image-id>    <time>    <size>
+todo-frontend   latest    <image-id>    <time>    <size>
+```
+
+### Step 3: Configure Secrets (CRITICAL!)
+
+Edit `todo-helm/values.yaml` and update the following sections:
+
+#### Backend Secrets
+
+```yaml
+backend:
+  secrets:
+    # Generate a strong 32+ character secret
+    JWT_SECRET: "CHANGE-THIS-your-super-secret-jwt-key-minimum-32-chars"
+
+    # Add your OpenAI API key
+    OPENAI_API_KEY: "sk-REPLACE-WITH-YOUR-OPENAI-API-KEY"
+
+    # Redis URL (or use local if not needed)
+    REDIS_URL: "redis://localhost:6379"
+```
+
+#### Frontend Secrets
+
+```yaml
+frontend:
+  secrets:
+    # Generate a strong 32+ character secret
+    BETTER_AUTH_SECRET: "CHANGE-THIS-your-super-secret-better-auth-minimum-32-chars"
+```
+
+#### Database Credentials
+
+```yaml
+database:
+  auth:
+    username: todouser
+    password: "CHANGE-THIS-strong-database-password"
+    database: todoapp
+```
+
+**= Security Note:**
+- Never commit these values to git
+- For production, use external secret management (Sealed Secrets, External Secrets Operator, Vault)
+- Generate secrets using: `openssl rand -base64 32`
+
+### Step 4: Review and Adjust Resources (Optional)
+
+The default configuration allocates:
+
+| Service | CPU Request | CPU Limit | Memory Request | Memory Limit |
+|---------|-------------|-----------|----------------|--------------|
+| Database | 250m | 500m | 256Mi | 512Mi |
+| Backend | 500m | 1000m | 512Mi | 1Gi |
+| Frontend | 500m | 1000m | 512Mi | 1Gi |
+
+**Total Minimum Requirements:** ~1.25 CPU cores, ~1.25Gi RAM
+
+Adjust in `values.yaml` if needed:
+
+```yaml
+backend:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+```
+
+### Step 5: Install the Helm Chart
+
+```bash
+# Create namespace
+kubectl create namespace todo-app
+
+# Verify namespace created
+kubectl get namespaces | grep todo-app
+
+# Install the chart
+helm install todo-app ./todo-helm --namespace todo-app
+
+# Watch the deployment
+kubectl get pods -n todo-app -w
+```
+
+**Expected Output:**
+```
+NAME                                       READY   STATUS    RESTARTS   AGE
+todo-app-backend-xxxxx                    1/1     Running   0          2m
+todo-app-database-xxxxx                   1/1     Running   0          2m
+todo-app-frontend-xxxxx                   1/1     Running   0          2m
+```
+
+### Step 6: Configure Local DNS
+
+```bash
+# Get Minikube IP
+minikube ip
+
+# Add to /etc/hosts (replace <MINIKUBE-IP> with actual IP)
+echo "$(minikube ip) todo-app.local" | sudo tee -a /etc/hosts
+
+# Verify entry was added
+cat /etc/hosts | grep todo-app
+```
+
+### Step 7: Verify Deployment
+
+```bash
+# Check all resources
+kubectl get all -n todo-app
+
+# Check ingress
+kubectl get ingress -n todo-app
+
+# Check configmaps and secrets
+kubectl get configmap -n todo-app
+kubectl get secret -n todo-app
+
+# Check persistent volume claim
+kubectl get pvc -n todo-app
+```
+
+### Step 8: Access the Application
+
+Open your browser and navigate to:
+
+- **Frontend**: http://todo-app.local
+- **Backend API Health**: http://todo-app.local/api/v1/health
+- **Backend API Docs**: http://todo-app.local/api/docs
+
+---
+
+## = Monitoring and Troubleshooting
+
+### Check Pod Status
+
+```bash
+# Get all pods
+kubectl get pods -n todo-app
+
+# Describe a pod
+kubectl describe pod <pod-name> -n todo-app
+
+# Check pod events
+kubectl get events -n todo-app --sort-by='.lastTimestamp'
+```
+
+### View Logs
+
+```bash
+# Backend logs (follow mode)
+kubectl logs -n todo-app -l app.kubernetes.io/name=todo-app-backend -f
+
+# Frontend logs
+kubectl logs -n todo-app -l app.kubernetes.io/name=todo-app-frontend -f
+
+# Database logs
+kubectl logs -n todo-app -l app.kubernetes.io/name=todo-app-database -f
+
+# All logs from a specific pod
+kubectl logs -n todo-app <pod-name> --tail=100 -f
+```
+
+### Common Issues and Solutions
+
+#### 1. Pods Not Starting (ImagePullBackOff)
+
+**Problem:** Pods stuck in `ImagePullBackOff` or `ErrImagePull`
+
+**Solution:**
+```bash
+# Ensure you're using Minikube's Docker daemon
+eval $(minikube docker-env)
+
+# Rebuild images
+cd backend && docker build -t todo-backend:latest .
+cd ../frontend && docker build -t todo-frontend:latest .
+
+# Verify images exist
+docker images | grep todo
+
+# Restart deployment
+kubectl rollout restart deployment -n todo-app
+```
+
+#### 2. Ingress Not Working
+
+**Problem:** Cannot access application via `todo-app.local`
+
+**Solution:**
+```bash
+# Check ingress addon is enabled
+minikube addons list | grep ingress
+
+# Enable if disabled
+minikube addons enable ingress
+
+# Wait for ingress controller
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=120s
+
+# Verify ingress resource
+kubectl get ingress -n todo-app
+kubectl describe ingress -n todo-app
+
+# Check /etc/hosts entry
+cat /etc/hosts | grep todo-app
+```
+
+#### 3. Database Connection Issues
+
+**Problem:** Backend can't connect to database
+
+**Solution:**
+```bash
+# Check database pod is running
+kubectl get pods -n todo-app -l app.kubernetes.io/name=todo-app-database
+
+# Check database service
+kubectl get svc -n todo-app -l app.kubernetes.io/name=todo-app-database
+
+# Test database connection from backend pod
+kubectl exec -it -n todo-app <backend-pod-name> -- \
+  pg_isready -h todo-app-database -U todouser
+
+# Check database logs
+kubectl logs -n todo-app <database-pod-name>
+```
+
+#### 4. Port Forward as Fallback
+
+If Ingress isn't working, access services directly:
+
+```bash
+# Frontend
+kubectl port-forward -n todo-app svc/todo-app-frontend 3000:3000
+# Access: http://localhost:3000
+
+# Backend
+kubectl port-forward -n todo-app svc/todo-app-backend 8000:8000
+# Access: http://localhost:8000
+
+# Database
+kubectl port-forward -n todo-app svc/todo-app-database 5432:5432
+# Access: postgresql://localhost:5432
+```
+
+---
+
+## = Updates and Maintenance
+
+### Upgrade the Release
+
+```bash
+# After making changes to values.yaml or templates
+helm upgrade todo-app ./todo-helm --namespace todo-app
+
+# Upgrade with new image tags
+helm upgrade todo-app ./todo-helm --namespace todo-app \
+  --set backend.image.tag=v1.1.0 \
+  --set frontend.image.tag=v1.1.0
+```
+
+### Rollback
+
+```bash
+# View release history
+helm history todo-app -n todo-app
+
+# Rollback to previous version
+helm rollback todo-app -n todo-app
+
+# Rollback to specific revision
+helm rollback todo-app 2 -n todo-app
+```
+
+### Update Secrets
+
+```bash
+# Method 1: Update values.yaml and upgrade
+# Edit values.yaml, then:
+helm upgrade todo-app ./todo-helm -n todo-app
+
+# Method 2: Update secret directly (temporary)
+kubectl edit secret todo-app-backend-secret -n todo-app
+```
+
+### Scale Services
+
+```bash
+# Scale backend
+kubectl scale deployment todo-app-backend -n todo-app --replicas=3
+
+# Scale frontend
+kubectl scale deployment todo-app-frontend -n todo-app --replicas=2
+
+# Or update values.yaml and upgrade
+```
+
+---
+
+## > Cleanup
+
+### Remove Everything
+
+```bash
+# Uninstall Helm release
+helm uninstall todo-app --namespace todo-app
+
+# Delete namespace (removes all resources)
+kubectl delete namespace todo-app
+
+# Verify cleanup
+kubectl get all -n todo-app
+# Should show: No resources found
+```
+
+### Remove /etc/hosts Entry
+
+```bash
+# Edit /etc/hosts and remove the line:
+# <MINIKUBE-IP> todo-app.local
+
+# Or use sed
+sudo sed -i '/todo-app.local/d' /etc/hosts
+```
+
+### Stop Minikube
+
+```bash
+minikube stop
+
+# Or delete completely
+minikube delete
+```
+
+---
+
+## = Helm Chart Configuration Reference
+
+### Key Configuration Options
+
+#### Image Tags
+
+```yaml
+backend:
+  image:
+    tag: "latest"  # Change for specific versions
+
+frontend:
+  image:
+    tag: "latest"  # Change for specific versions
+```
+
+#### Enable Autoscaling
+
+```yaml
+backend:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+```
+
+#### Disable Ingress (use port-forward)
+
+```yaml
+ingress:
+  enabled: false
+```
+
+#### Change Storage Size
+
+```yaml
+database:
+  persistence:
+    size: 10Gi  # Increase for production
+```
+
+#### Update Conversational AI Settings
+
+```yaml
+backend:
+  env:
+    AI_MODEL: "gpt-4-turbo"
+    RATE_LIMIT_REQUESTS_PER_MINUTE: "20"
+    CONVERSATION_RETENTION_DAYS: "60"
+    MAX_ACTIVE_CONVERSATIONS_PER_USER: "5"
+```
+
+---
+
+## < Next Steps
+
+### For Development
+1.  Deploy using the steps above
+2.  Test all features (authentication, task CRUD, chat)
+3.  Monitor logs for errors
+4.  Iterate on configuration as needed
+
+### For Production
+1.  Use external secret management (Vault, AWS Secrets Manager)
+2.  Configure TLS certificates for HTTPS
+3.  Set up monitoring and alerting (Prometheus, Grafana)
+4.  Implement backup strategy for PostgreSQL
+5.  Enable autoscaling based on load testing
+6.  Configure network policies for security
+7.  Use production-grade ingress controller
+8.  Set up CI/CD pipeline for automated deployments
+
+---
+
+## = Additional Resources
+
+- **Helm Documentation**: https://helm.sh/docs/
+- **Kubernetes Documentation**: https://kubernetes.io/docs/
+- **Minikube Guide**: https://minikube.sigs.k8s.io/docs/
+- **NGINX Ingress Controller**: https://kubernetes.github.io/ingress-nginx/
+
+---
+
+##  Deployment Checklist
+
+Use this checklist when deploying:
+
+- [ ] Minikube started with sufficient resources
+- [ ] Ingress addon enabled
+- [ ] Docker images built and available
+- [ ] `values.yaml` secrets updated (JWT_SECRET, OPENAI_API_KEY, etc.)
+- [ ] Namespace created (`todo-app`)
+- [ ] Helm chart installed successfully
+- [ ] All pods in Running state
+- [ ] Ingress created and accessible
+- [ ] `/etc/hosts` configured
+- [ ] Frontend accessible at http://todo-app.local
+- [ ] Backend health check passing at http://todo-app.local/api/v1/health
+- [ ] Database persistent volume created
+- [ ] Tested: User signup/login
+- [ ] Tested: Task CRUD operations
+- [ ] Tested: Conversational AI chat interface
+
+---
+
+## < Support
+
+If you encounter issues:
+
+1. Check logs: `kubectl logs -n todo-app <pod-name>`
+2. Describe resources: `kubectl describe pod/svc/ingress -n todo-app <name>`
+3. Review events: `kubectl get events -n todo-app --sort-by='.lastTimestamp'`
+4. Consult the troubleshooting section above
+
+---
+
+**Last Updated**: February 6, 2026
+**Maintained By**: Development Team
+**Chart Version**: 1.0.0
