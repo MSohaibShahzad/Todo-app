@@ -64,11 +64,11 @@ export function CategoryInput({
   }
 
   return (
-    <div className="relative">
+    <div className="relative space-y-2">
       {label && (
         <label
           htmlFor="category-input"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-semibold text-white/90"
         >
           {label}
         </label>
@@ -82,24 +82,27 @@ export function CategoryInput({
         onFocus={() => setShowSuggestions(true)}
         disabled={disabled}
         placeholder={placeholder}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+        className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#3B82F6] focus:border-[#3B82F6]/50 backdrop-blur-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       />
 
       {/* Suggestions dropdown */}
       {showSuggestions && filteredSuggestions.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto"
+          className="absolute z-20 w-full mt-2 bg-gradient-to-br from-[#1A1F2E] to-[#232936] border border-white/20 rounded-xl shadow-2xl max-h-48 overflow-y-auto backdrop-blur-lg"
         >
-          <div className="py-1">
+          <div className="py-2">
             {filteredSuggestions.map((suggestion, index) => (
               <button
                 key={index}
                 type="button"
                 onClick={() => handleSelectSuggestion(suggestion)}
-                className="w-full text-left px-3 py-2 hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:outline-none transition-colors"
+                className="w-full text-left px-4 py-2.5 text-white/90 hover:bg-[#3B82F6]/20 hover:text-white focus:bg-[#3B82F6]/30 focus:outline-none transition-all border-b border-white/5 last:border-b-0"
               >
-                {suggestion}
+                <span className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-gradient-to-r from-[#3B82F6] to-[#06B6D4]" />
+                  {suggestion}
+                </span>
               </button>
             ))}
           </div>

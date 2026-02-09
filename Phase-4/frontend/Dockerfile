@@ -16,8 +16,16 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Accept build arguments for Next.js public env vars
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_BACKEND_URL
+ARG NEXT_PUBLIC_CHATKIT_DOMAIN_KEY
+
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_BACKEND_URL=${NEXT_PUBLIC_BACKEND_URL}
+ENV NEXT_PUBLIC_CHATKIT_DOMAIN_KEY=${NEXT_PUBLIC_CHATKIT_DOMAIN_KEY}
 
 # Build the application
 RUN npm run build

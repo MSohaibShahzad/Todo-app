@@ -33,6 +33,18 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+        {/* Polyfill for crypto.randomUUID() - required for ChatKit */}
+        <Script id="crypto-polyfill" strategy="beforeInteractive">
+          {`
+            if (typeof crypto !== 'undefined' && !crypto.randomUUID) {
+              crypto.randomUUID = function() {
+                return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, function(c) {
+                  return (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16);
+                });
+              };
+            }
+          `}
+        </Script>
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

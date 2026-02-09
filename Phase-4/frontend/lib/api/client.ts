@@ -1,14 +1,12 @@
 /**
  * Base API client with authentication and error handling
  *
- * Uses relative URLs to leverage Next.js proxy (next.config.ts rewrites)
- * All /api/v1/* requests are automatically proxied to backend
+ * In Kubernetes: Uses NEXT_PUBLIC_API_URL to directly call the backend
+ * In development: Uses relative URLs with Next.js proxy
  */
 import type { APIError } from "@/types/api"
 import { getJWTToken } from "@/lib/auth/client"
-
-// Use empty string for relative URLs - Next.js will proxy /api/v1/* to backend
-const API_URL = ""
+import { API_URL } from "@/lib/config"
 
 export class APIClient {
   private baseURL: string

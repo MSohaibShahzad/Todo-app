@@ -45,6 +45,11 @@ spec:
             configMapKeyRef:
               name: {{ include "todo-app.frontend.fullname" . }}-config
               key: NEXT_PUBLIC_API_URL
+        - name: NEXT_PUBLIC_APP_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "todo-app.frontend.fullname" . }}-config
+              key: NEXT_PUBLIC_APP_URL
         - name: NEXT_PUBLIC_BACKEND_URL
           valueFrom:
             configMapKeyRef:

@@ -1,33 +1,36 @@
 <!--
 Sync Impact Report:
-- Version change: 2.0.0 → 3.0.0 (Phase-3 Conversational AI - Major architecture expansion)
+- Version change: 3.0.0 → 4.0.0 (Phase-4 Kubernetes/Helm Deployment - Infrastructure & DevOps)
 - Modified principles:
-  - Scope expanded to include conversational interface
-  - Added AI & Tooling Rules for agent architecture
-  - Added MCP Architecture requirements
-  - Added State Management constraints
-  - Updated Frontend Constraints for OpenAI ChatKit
+  - Scope expanded to include Kubernetes deployment and infrastructure as code
+  - Added Kubernetes/Helm Architecture principles
+  - Added Container & Image Management rules
+  - Added Infrastructure Configuration Management
+  - Added Health & Observability requirements
+  - Updated deployment and scaling constraints
 - Added sections:
-  - Interaction Model (UI + Conversational)
-  - AI & Tooling Rules
-  - MCP Architecture
-  - State Management
-  - Frontend Constraints for conversational UI
+  - Kubernetes/Helm Architecture
+  - Container Standards
+  - Configuration Management (ConfigMaps/Secrets)
+  - Health Probes & Monitoring
+  - Resource Management & Scaling
 - Phase Evolution:
   - Phase I: Console (completed)
   - Phase II: Full-Stack Web (completed)
-  - Phase III: Conversational AI (new)
+  - Phase III: Conversational AI (completed)
+  - Phase IV: Kubernetes/Helm Deployment (new)
 - Templates requiring updates:
-  ✅ All templates apply to Phase-3
-  ✅ Constitution governs all future development
+  ✅ All templates apply to Phase-4
+  ✅ Constitution governs all future development including infrastructure
 - Follow-up TODOs: None
 -->
 
 # Project Constitution
 
 ## Project Scope
-- This project evolves in phases: Phase I (Console), Phase II (Full-Stack), Phase III (Conversational AI).
-- Phase III adds a conversational interface on top of the existing system.
+- This project evolves in phases: Phase I (Console), Phase II (Full-Stack), Phase III (Conversational AI), Phase IV (Kubernetes/Helm Deployment).
+- Phase IV adds production-ready local Kubernetes deployment with Helm charts.
+- All deployment configurations must be declarative, version-controlled, and reproducible.
 - Existing functionality must not be broken while extending features.
 
 ## Interaction Model
@@ -55,6 +58,62 @@ Sync Impact Report:
 ## Frontend Constraints
 - Conversational UI must be implemented using OpenAI ChatKit.
 - Frontend must communicate with backend through defined APIs only.
+
+## Kubernetes/Helm Architecture (Phase IV)
+
+### Helm Chart Structure
+- All Kubernetes resources must be defined in Helm templates.
+- Helm charts must follow semantic versioning.
+- Each service (database, backend, frontend) must have dedicated deployment and service manifests.
+- ConfigMaps and Secrets must be used for all configuration and sensitive data.
+
+### Container Standards
+- Docker images must use multi-stage builds for optimization.
+- Images must be tagged with semantic versions, not 'latest' in production.
+- Build arguments must be used for environment-specific configurations.
+- Images must run as non-root users where possible.
+
+### Configuration Management
+- Environment variables must be stored in ConfigMaps (non-sensitive) or Secrets (sensitive).
+- Database connection strings must be generated from templates, not hardcoded.
+- All secrets (JWT, API keys, passwords) must be parameterized in values.yaml.
+- Configuration must support both local (Minikube) and production environments.
+
+### Health & Observability
+- All services must implement health check endpoints.
+- Liveness and readiness probes must be configured for all deployments.
+- Resource limits (CPU/memory) and requests must be defined for all containers.
+- Pod disruption budgets should be considered for production deployments.
+
+### Networking & Ingress
+- Services must use ClusterIP for internal communication.
+- A single Ingress resource must handle path-based routing to all services.
+- Backend APIs must be proxied through the frontend when needed.
+- CORS must be properly configured for cross-origin requests.
+
+### Data Persistence
+- Databases must use PersistentVolumeClaims for data storage.
+- Storage class and size must be configurable via values.yaml.
+- Data must persist across pod restarts and redeployments.
+- Backup and restore strategies must be documented.
+
+### Deployment Strategy
+- Deployments must be reproducible and version-controlled.
+- Helm upgrade must be the standard deployment method.
+- Rollback capability must be maintained via Helm revisions.
+- Zero-downtime deployments should be achievable for stateless services.
+
+### Local Development (Minikube)
+- Minikube must be the primary local Kubernetes environment.
+- Port-forwarding scripts must be provided for local access.
+- Images must be loadable into Minikube's Docker daemon.
+- Ingress addon must be used for hostname-based routing.
+
+### Resource Management
+- Horizontal Pod Autoscaler configurations must be provided but optional.
+- Resource quotas must be sensible for local development (4 CPU, 8GB RAM).
+- Database resources must be prioritized to ensure stability.
+- Frontend/backend can scale horizontally; database scaling requires more planning.
 
 ## Code Quality & Extensibility
 - Existing code must be reused and extended, not rewritten.
@@ -282,4 +341,4 @@ Each phase builds on the previous phase without breaking existing functionality:
 - Unjustified complexity is grounds for rejection
 - Phase transitions require explicit constitution review
 
-**Version**: 3.0.0 | **Ratified**: 2026-01-02 | **Last Amended**: 2026-01-15 | **Phase**: III (Conversational AI)
+**Version**: 4.0.0 | **Ratified**: 2026-01-02 | **Last Amended**: 2026-02-09 | **Phase**: IV (Kubernetes/Helm Deployment)

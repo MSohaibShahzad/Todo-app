@@ -1,7 +1,22 @@
 import { createAuthClient } from "better-auth/react";
 
+/**
+ * Get the base URL for Better Auth at runtime.
+ * In Kubernetes/production, we can't rely on build-time NEXT_PUBLIC_* env vars
+ * because the Docker image is built once and deployed to different environments.
+ * Instead, we use window.location.origin which gives us the actual URL the user is accessing.
+ */
+function getBaseURL(): string {
+  // Client-side: always use the current origin (works in all environments)
+  if (typeof window !== "undefined") {
+    return window.location.origin;
+  }
+  // Server-side: use localhost as fallback (won't be used for auth client calls)
+  return "http://localhost:3000";
+}
+
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+  baseURL: getBaseURL(),
 });
 
 export const {
