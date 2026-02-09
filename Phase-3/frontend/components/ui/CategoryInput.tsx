@@ -64,11 +64,11 @@ export function CategoryInput({
   }
 
   return (
-    <div className="relative">
+    <div className="relative space-y-2">
       {label && (
         <label
           htmlFor="category-input"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-semibold text-gray-700"
         >
           {label}
         </label>
@@ -82,7 +82,7 @@ export function CategoryInput({
         onFocus={() => setShowSuggestions(true)}
         disabled={disabled}
         placeholder={placeholder}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+        className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3B82F6] focus:border-[#3B82F6] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       />
 
       {/* Suggestions dropdown */}

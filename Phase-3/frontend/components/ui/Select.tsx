@@ -15,34 +15,36 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     const selectId = id || label?.toLowerCase().replace(/\s+/g, "-")
 
     return (
-      <div className="w-full">
+      <div className="w-full space-y-2">
         {label && (
           <label
             htmlFor={selectId}
-            className="block text-sm font-medium text-white/90 mb-2"
+            className="block text-sm font-semibold text-gray-700"
           >
             {label}
+            {props.required && <span className="text-red-500 ml-1">*</span>}
           </label>
         )}
         <select
           ref={ref}
           id={selectId}
           className={cn(
-            "w-full px-3 py-3 border rounded-xl shadow-sm focus:outline-none focus:ring-2 bg-white/10 backdrop-blur-sm text-white transition-all",
+            "w-full px-4 py-3 bg-gray-50 border rounded-xl text-gray-900 focus:outline-none focus:ring-2 transition-all",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
             error
-              ? "border-red-400/50 focus:ring-red-500 focus:border-red-500"
-              : "border-white/20 focus:ring-[#3B82F6] focus:border-[#3B82F6]/50",
+              ? "border-red-400 focus:ring-red-500 focus:border-red-500"
+              : "border-gray-300 focus:ring-[#3B82F6] focus:border-[#3B82F6]",
             className
           )}
           {...props}
         >
           {options.map((option) => (
-            <option key={option.value} value={option.value} className="bg-[#1A1F2E] text-white">
+            <option key={option.value} value={option.value} className="bg-white text-gray-900">
               {option.label}
             </option>
           ))}
         </select>
-        {error && <p className="mt-1 text-sm text-red-300">{error}</p>}
+        {error && <p className="mt-1.5 text-sm text-red-400">{error}</p>}
       </div>
     )
   }

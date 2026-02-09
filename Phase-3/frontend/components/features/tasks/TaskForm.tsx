@@ -66,10 +66,10 @@ export function TaskForm({
         placeholder="Enter task title"
       />
 
-      <div>
+      <div className="space-y-2">
         <label
           htmlFor="description"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-semibold text-gray-700"
         >
           Description
         </label>
@@ -82,7 +82,7 @@ export function TaskForm({
           disabled={isLoading}
           placeholder="Enter task description (optional)"
           rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#3B82F6] focus:border-[#3B82F6] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         />
       </div>
 
