@@ -344,11 +344,13 @@ class TaskManagementChatKitServer(ChatKitServer):
         # Convert current ChatKit input to Agents SDK format
         current_input = await simple_to_agent_input(input) if input else []
 
+        # Generate title IMMEDIATELY for first message (before streaming)
+        # This ensures the title is set when ChatKit loads the thread list
+        if not conversation_history and input and thread.id:
+            await self._generate_thread_title_sync(thread, input, context)
+
         # Combine conversation history with current input
         agent_input = conversation_history + current_input
-
-        # Track if this is the first message (for title generation after streaming)
-        is_first_message = not conversation_history and input and thread.id
 
         # Run agent in streaming mode
         result = Runner.run_streamed(
@@ -361,92 +363,75 @@ class TaskManagementChatKitServer(ChatKitServer):
         async for event in stream_agent_response(agent_context, result):
             yield event
 
-        # Generate thread title AFTER streaming completes (for first message only)
-        if is_first_message:
-            await self._generate_thread_title(thread, input, context)
-
-    async def _generate_thread_title(
+    async def _generate_thread_title_sync(
         self,
         thread: ThreadMetadata,
         user_message: UserMessageItem,
         context: Any,
     ) -> None:
-        """Generate a descriptive title for the thread based on the first user message.
+        """Generate a simple title immediately from the first user message.
 
-        Uses OpenAI to create a concise 3-5 word title, similar to ChatGPT.
-        Falls back to truncated message text if AI generation fails.
+        Creates title from first 40 characters of message. This happens
+        BEFORE streaming starts so the title is available immediately.
 
         Args:
             thread: Thread metadata to update
             user_message: First user message in the thread
             context: Request context
         """
-        # Extract user message text
-        message_text = ""
-        if hasattr(user_message, 'content') and isinstance(user_message.content, list):
-            for part in user_message.content:
-                if hasattr(part, 'text'):
-                    message_text = str(part.text)
-                    break
-
-        if not message_text:
-            print("[ChatKit] No message text found for title generation")
-            return  # Can't generate title without text
-
-        print(f"[ChatKit] Generating title for thread {thread.id}: '{message_text[:50]}...'")
-
-        generated_title = None
-
-        # Try to generate title with OpenAI
         try:
-            response = await openai.chat.completions.create(
-                model="gpt-4o-mini",  # Fast, cheap model for title generation
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Generate a concise 3-5 word title for this conversation. Return ONLY the title, no quotes or punctuation."
-                    },
-                    {
-                        "role": "user",
-                        "content": message_text
-                    }
-                ],
-                max_tokens=15,
-                temperature=0.7,
-            )
-            generated_title = response.choices[0].message.content.strip()
-            print(f"[ChatKit] OpenAI generated title: '{generated_title}'")
-        except Exception as ai_error:
-            print(f"[ChatKit] OpenAI title generation failed: {ai_error}")
-            # Fallback: Use first 50 chars of message
-            generated_title = message_text[:50].strip()
-            if len(message_text) > 50:
+            # Extract user message text
+            message_text = ""
+            if hasattr(user_message, 'content') and isinstance(user_message.content, list):
+                for part in user_message.content:
+                    if hasattr(part, 'text'):
+                        message_text = str(part.text).strip()
+                        break
+
+            if not message_text:
+                print("[ChatKit] No message text for title")
+                return
+
+            # Generate simple title from message text
+            # Take first 40 chars, capitalize first letter
+            generated_title = message_text[:40]
+            if len(message_text) > 40:
+                # Find last space to avoid cutting words
+                last_space = generated_title.rfind(' ')
+                if last_space > 20:  # Only if we have at least 20 chars
+                    generated_title = generated_title[:last_space]
                 generated_title += "..."
-            print(f"[ChatKit] Using fallback title: '{generated_title}'")
 
-        if not generated_title:
-            return
+            # Capitalize first letter
+            if generated_title:
+                generated_title = generated_title[0].upper() + generated_title[1:]
 
-        # Save title to database using a NEW session to avoid transaction conflicts
-        try:
-            # Get a fresh session from the async_session_maker
-            from src.database import async_session_maker
-            from sqlalchemy import select as sql_select, update
+            print(f"[ChatKit] Generated title for thread {thread.id}: '{generated_title}'")
+
+            # Update title in thread metadata (for current request)
+            thread.metadata["title"] = generated_title
+
+            # Save to database immediately using context session
+            session = context.get("session")
+            if not session:
+                print("[ChatKit] ❌ No session in context")
+                return
+
+            from sqlalchemy import update as sql_update
             from src.models.conversation import Conversation
 
-            async with async_session_maker() as fresh_session:
-                # Update using a direct SQL statement for reliability
-                stmt = (
-                    update(Conversation)
-                    .where(Conversation.id == thread.id)
-                    .values(title=generated_title, updated_at=datetime.utcnow())
-                )
-                await fresh_session.execute(stmt)
-                await fresh_session.commit()
-                print(f"[ChatKit] ✅ Title '{generated_title}' saved to database for thread {thread.id}")
+            # Update the conversation directly
+            stmt = (
+                sql_update(Conversation)
+                .where(Conversation.id == thread.id)
+                .values(title=generated_title, updated_at=datetime.utcnow())
+            )
+            await session.execute(stmt)
+            await session.commit()
 
-        except Exception as db_error:
-            print(f"[ChatKit] ❌ Error saving title to database: {db_error}")
+            print(f"[ChatKit] ✅ Title saved: '{generated_title}' for thread {thread.id}")
+
+        except Exception as e:
+            print(f"[ChatKit] ❌ Error generating title: {e}")
             import traceback
             traceback.print_exc()
-            # Don't fail the request if title save fails
