@@ -93,7 +93,7 @@ class SQLAlchemyStore(Store[Dict[str, Any]]):
             conversation = Conversation(
                 id=thread.id,
                 user_id=user_id,
-                title=thread.metadata.get("title", "Chat"),
+                title=thread.metadata.get("title", "New Conversation"),
                 is_active=True,
                 created_at=thread.created_at or datetime.utcnow(),
                 updated_at=datetime.utcnow()

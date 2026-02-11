@@ -1,6 +1,7 @@
 """ChatKit server implementation for task management."""
 from typing import Any, AsyncIterator, Optional, List
 
+import openai
 from agents import Agent, Runner, function_tool, RunContextWrapper
 from chatkit.server import ChatKitServer
 from chatkit.types import ThreadMetadata, UserMessageItem, ThreadStreamEvent
@@ -342,6 +343,10 @@ class TaskManagementChatKitServer(ChatKitServer):
         # Convert current ChatKit input to Agents SDK format
         current_input = await simple_to_agent_input(input) if input else []
 
+        # Generate thread title from first user message (like ChatGPT)
+        if not conversation_history and input and thread.id:
+            await self._generate_thread_title(thread, input, context)
+
         # Combine conversation history with current input
         agent_input = conversation_history + current_input
 
@@ -355,3 +360,62 @@ class TaskManagementChatKitServer(ChatKitServer):
         # Stream agent response events back to ChatKit
         async for event in stream_agent_response(agent_context, result):
             yield event
+
+    async def _generate_thread_title(
+        self,
+        thread: ThreadMetadata,
+        user_message: UserMessageItem,
+        context: Any,
+    ) -> None:
+        """Generate a descriptive title for the thread based on the first user message.
+
+        Uses OpenAI to create a concise 3-5 word title, similar to ChatGPT.
+
+        Args:
+            thread: Thread metadata to update
+            user_message: First user message in the thread
+            context: Request context
+        """
+        try:
+            # Extract user message text
+            message_text = ""
+            if hasattr(user_message, 'content') and isinstance(user_message.content, list):
+                for part in user_message.content:
+                    if hasattr(part, 'text'):
+                        message_text = str(part.text)
+                        break
+
+            if not message_text:
+                return  # Can't generate title without text
+
+            # Use OpenAI to generate a concise title
+            import openai
+            response = await openai.chat.completions.create(
+                model="gpt-4o-mini",  # Fast, cheap model for title generation
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Generate a concise 3-5 word title for this conversation. Return ONLY the title, no quotes or punctuation."
+                    },
+                    {
+                        "role": "user",
+                        "content": message_text
+                    }
+                ],
+                max_tokens=15,
+                temperature=0.7,
+            )
+
+            generated_title = response.choices[0].message.content.strip()
+
+            # Update thread metadata with generated title
+            thread.metadata["title"] = generated_title
+
+            # Save updated thread to database
+            await self.store.save_thread(thread, context)
+
+            print(f"[ChatKit] Generated thread title: '{generated_title}'")
+
+        except Exception as e:
+            print(f"[ChatKit] Error generating thread title: {e}")
+            # Don't fail the request if title generation fails
