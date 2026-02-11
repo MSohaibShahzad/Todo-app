@@ -1,8 +1,6 @@
 """ChatKit server implementation for task management."""
-from datetime import datetime
 from typing import Any, AsyncIterator, Optional, List
 
-import openai
 from agents import Agent, Runner, function_tool, RunContextWrapper
 from chatkit.server import ChatKitServer
 from chatkit.types import ThreadMetadata, UserMessageItem, ThreadStreamEvent
@@ -347,9 +345,6 @@ class TaskManagementChatKitServer(ChatKitServer):
         # Combine conversation history with current input
         agent_input = conversation_history + current_input
 
-        # Track if this is the first message (for title generation after streaming)
-        is_first_message = not conversation_history and input and thread.id
-
         # Run agent in streaming mode
         result = Runner.run_streamed(
             self.task_agent,
@@ -360,93 +355,3 @@ class TaskManagementChatKitServer(ChatKitServer):
         # Stream agent response events back to ChatKit
         async for event in stream_agent_response(agent_context, result):
             yield event
-
-        # Generate thread title AFTER streaming completes (for first message only)
-        if is_first_message:
-            await self._generate_thread_title(thread, input, context)
-
-    async def _generate_thread_title(
-        self,
-        thread: ThreadMetadata,
-        user_message: UserMessageItem,
-        context: Any,
-    ) -> None:
-        """Generate a descriptive title for the thread based on the first user message.
-
-        Uses OpenAI to create a concise 3-5 word title, similar to ChatGPT.
-        Falls back to truncated message text if AI generation fails.
-
-        Args:
-            thread: Thread metadata to update
-            user_message: First user message in the thread
-            context: Request context
-        """
-        # Extract user message text
-        message_text = ""
-        if hasattr(user_message, 'content') and isinstance(user_message.content, list):
-            for part in user_message.content:
-                if hasattr(part, 'text'):
-                    message_text = str(part.text)
-                    break
-
-        if not message_text:
-            print("[ChatKit] No message text found for title generation")
-            return  # Can't generate title without text
-
-        print(f"[ChatKit] Generating title for thread {thread.id}: '{message_text[:50]}...'")
-
-        generated_title = None
-
-        # Try to generate title with OpenAI
-        try:
-            response = await openai.chat.completions.create(
-                model="gpt-4o-mini",  # Fast, cheap model for title generation
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "Generate a concise 3-5 word title for this conversation. Return ONLY the title, no quotes or punctuation."
-                    },
-                    {
-                        "role": "user",
-                        "content": message_text
-                    }
-                ],
-                max_tokens=15,
-                temperature=0.7,
-            )
-            generated_title = response.choices[0].message.content.strip()
-            print(f"[ChatKit] OpenAI generated title: '{generated_title}'")
-        except Exception as ai_error:
-            print(f"[ChatKit] OpenAI title generation failed: {ai_error}")
-            # Fallback: Use first 50 chars of message
-            generated_title = message_text[:50].strip()
-            if len(message_text) > 50:
-                generated_title += "..."
-            print(f"[ChatKit] Using fallback title: '{generated_title}'")
-
-        if not generated_title:
-            return
-
-        # Save title to database using a NEW session to avoid transaction conflicts
-        try:
-            # Get a fresh session from the async_session_maker
-            from src.database import async_session_maker
-            from sqlalchemy import select as sql_select, update
-            from src.models.conversation import Conversation
-
-            async with async_session_maker() as fresh_session:
-                # Update using a direct SQL statement for reliability
-                stmt = (
-                    update(Conversation)
-                    .where(Conversation.id == thread.id)
-                    .values(title=generated_title, updated_at=datetime.utcnow())
-                )
-                await fresh_session.execute(stmt)
-                await fresh_session.commit()
-                print(f"[ChatKit] ✅ Title '{generated_title}' saved to database for thread {thread.id}")
-
-        except Exception as db_error:
-            print(f"[ChatKit] ❌ Error saving title to database: {db_error}")
-            import traceback
-            traceback.print_exc()
-            # Don't fail the request if title save fails
