@@ -1,5 +1,7 @@
 # Todo Application - Complete Project
 
+**🌐 Live Production App:** [https://nexus-tasks.vercel.app](https://nexus-tasks.vercel.app)
+
 A comprehensive todo application showcasing the evolution from a console-based application to a full-stack web application with conversational AI, deployed on Kubernetes.
 
 ## 🎯 Project Evolution
