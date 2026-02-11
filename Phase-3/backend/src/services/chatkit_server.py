@@ -1,4 +1,5 @@
 """ChatKit server implementation for task management."""
+from datetime import datetime
 from typing import Any, AsyncIterator, Optional, List
 
 import openai
@@ -386,10 +387,12 @@ class TaskManagementChatKitServer(ChatKitServer):
                         break
 
             if not message_text:
+                print("[ChatKit] No message text found for title generation")
                 return  # Can't generate title without text
 
+            print(f"[ChatKit] Generating title for message: '{message_text[:50]}...'")
+
             # Use OpenAI to generate a concise title
-            import openai
             response = await openai.chat.completions.create(
                 model="gpt-4o-mini",  # Fast, cheap model for title generation
                 messages=[
@@ -407,15 +410,36 @@ class TaskManagementChatKitServer(ChatKitServer):
             )
 
             generated_title = response.choices[0].message.content.strip()
+            print(f"[ChatKit] Generated title: '{generated_title}'")
 
             # Update thread metadata with generated title
             thread.metadata["title"] = generated_title
 
-            # Save updated thread to database
-            await self.store.save_thread(thread, context)
+            # Save updated thread to database with explicit session handling
+            session = context.get("session")
+            if session:
+                # Refresh and update the conversation directly
+                from sqlalchemy import select as sql_select
+                from src.models.conversation import Conversation
 
-            print(f"[ChatKit] Generated thread title: '{generated_title}'")
+                result = await session.execute(
+                    sql_select(Conversation).where(Conversation.id == thread.id)
+                )
+                conversation = result.scalar_one_or_none()
+
+                if conversation:
+                    conversation.title = generated_title
+                    conversation.updated_at = datetime.utcnow()
+                    await session.commit()
+                    await session.refresh(conversation)
+                    print(f"[ChatKit] Title saved to database for thread {thread.id}")
+                else:
+                    print(f"[ChatKit] Warning: Thread {thread.id} not found in database")
+            else:
+                print("[ChatKit] Warning: No session in context, cannot save title")
 
         except Exception as e:
             print(f"[ChatKit] Error generating thread title: {e}")
+            import traceback
+            traceback.print_exc()
             # Don't fail the request if title generation fails
