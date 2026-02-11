@@ -59,10 +59,19 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS middleware - allow all origins in development
+# CORS middleware - allow specific origins with credentials
+# Note: Cannot use "*" with allow_credentials=True (browser security)
+allowed_origins = [
+    settings.frontend_url,  # Primary frontend URL from env
+    "http://localhost:3000",  # Local development
+    "https://nexus-tasks.vercel.app",  # Production Vercel
+]
+# Remove duplicates and filter out empty strings
+allowed_origins = list(set(filter(None, allowed_origins)))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for now
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
