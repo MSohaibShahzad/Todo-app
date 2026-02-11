@@ -13,11 +13,12 @@ export default function ChatInterface() {
   // Initialize ChatKit with custom backend server
   // For custom backends, use url + domainKey pattern
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const domainKey = process.env.NEXT_PUBLIC_CHATKIT_DOMAIN_KEY || 'local-dev'
 
   const { control } = useChatKit({
     api: {
       url: `${apiUrl}/api/v1/chatkit`,
-      domainKey: 'local-dev', // For localhost development, can use any value
+      domainKey, // Read from environment variable
       fetch: async (input, init) => {
         // Get JWT token using the proper auth function
         const jwtToken = await getJWTToken()
